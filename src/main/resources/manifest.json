@@ -2,7 +2,7 @@
   "Group": "Pedro",
   "Name": "Advenced Vein Mining",
   "Version": "${version}",
-  "Description": "Mineracao ao agachar, com grades de blocos e ferramentas, alcance e ativacao por jogador.",
+  "Description": "Vein mining with configurable blocks, tools, range and activation for each player.",
   "Authors": [{ "Name": "Pedro" }],
   "Main": "br.pedro.hytale.veinminer.VeinMinerPlugin",
   "ServerVersion": "=0.7.5",

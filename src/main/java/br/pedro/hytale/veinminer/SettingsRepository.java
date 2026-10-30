@@ -37,7 +37,7 @@ final class SettingsRepository {
         values.setProperty("Tools", settings.tools().stream().sorted().collect(Collectors.joining(",")));
         Path temporary = Files.createTempFile(directory, player.toString(), ".tmp");
         try {
-            try (var stream = Files.newOutputStream(temporary)) { values.store(stream, "Advenced Vein Mining - configuracao do jogador"); }
+            try (var stream = Files.newOutputStream(temporary)) { values.store(stream, "Advenced Vein Mining - player settings"); }
             try {
                 Files.move(temporary, file(player), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
             } catch (AtomicMoveNotSupportedException ignored) {
@@ -64,7 +64,7 @@ final class SettingsRepository {
                 Integer.parseInt(values.getProperty("Radius", "8")),
                 PlayerSettings.Activation.valueOf(values.getProperty("Activation", "CROUCH")));
         } catch (IOException | IllegalArgumentException error) {
-            warning.accept("Advenced Vein Mining: configuracao invalida de " + player + "; usando padrao. " + error.getMessage());
+            warning.accept("Advenced Vein Mining: invalid settings for " + player + "; using defaults. " + error.getMessage());
             return PlayerSettings.defaults();
         }
     }

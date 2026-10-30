@@ -1,6 +1,6 @@
 # Advenced Vein Mining
 
-Abra o menu de configuração com qualquer um dos comandos:
+Open the settings menu with any of these commands:
 
 ```text
 /veinminer

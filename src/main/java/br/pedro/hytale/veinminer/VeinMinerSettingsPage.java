@@ -32,6 +32,7 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
     private static final int COLUMNS = 5;
     private record Entry(String id, Item item, String name, String search) {}
     private final SettingsRepository settings;
+    private final UiLanguage language;
     private final Set<String> blocks;
     private final Set<String> tools;
     private final List<Entry> blockCatalog;
@@ -48,11 +49,12 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
     private ScheduledFuture<?> pendingSearch;
     private long searchRevision;
     private boolean dismissed;
-    private String status = "Alterações aplicadas ao salvar.";
+    private String statusKey = "status.pending";
 
     VeinMinerSettingsPage(PlayerRef playerRef, SettingsRepository settings) {
         super(playerRef, CustomPageLifetime.CanDismiss, Data.CODEC);
         this.settings = settings;
+        language = UiLanguage.from(playerRef.getLanguage());
         PlayerSettings current = settings.get(playerRef.getUuid());
         blocks = new HashSet<>(current.blocks());
         tools = new HashSet<>(current.tools());
@@ -78,7 +80,8 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
     }
 
     private Entry entry(String id, Item item) {
-        String name = I18nModule.get().getMessage(playerRef.getLanguage(), item.getTranslationKey());
+        String name = I18nModule.get().getMessage(language.assetLocale, item.getTranslationKey());
+        if (name == null || name.isBlank()) name = I18nModule.get().getMessage("en-US", item.getTranslationKey());
         if (name == null || name.isBlank()) name = id.replace('_', ' ');
         return new Entry(id, item, name, CatalogSearch.normalize(id + " " + name));
     }
@@ -116,8 +119,10 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
         visibleCards.clear();
         window.reset(filtered);
         appendBatch(commands, events);
-        if (filtered.isEmpty()) commands.appendInline("#Grid",
-            "Label { Text: \"Nenhum resultado. Tente outro nome ou ID.\"; Anchor: (Height: 40); Style: (FontSize: 14, TextColor: #a8b6c6); }");
+        if (filtered.isEmpty()) {
+            commands.appendInline("#Grid", "Label #Empty { Anchor: (Height: 40); Style: (FontSize: 14, TextColor: #a8b6c6); }");
+            commands.set("#Empty.Text", language.text("empty"));
+        }
     }
 
     private void appendBatch(UICommandBuilder commands, UIEventBuilder events) {
@@ -148,21 +153,28 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
     }
 
     private void renderControls(UICommandBuilder commands) {
-        commands.set("#Filter.Text", selectedOnly ? "Mostrar todos" : "Somente marcados");
-        commands.set("#BlocksTab.Text", "Blocos (" + blocks.size() + ")" + (toolMenu ? "" : " •"));
-        commands.set("#ToolsTab.Text", "Ferramentas (" + tools.size() + ")" + (toolMenu ? " •" : ""));
-        commands.set("#CatalogTitle.Text", (toolMenu ? "FERRAMENTAS PERMITIDAS" : "BLOCOS AFETADOS")
+        commands.set("#PageHeading.Text", language.text("title"));
+        commands.set("#Search.PlaceholderText", language.text("search"));
+        commands.set("#RangeSection.Text", language.text("range.section"));
+        commands.set("#RangeTitle.Text", language.text("range.title"));
+        commands.set("#RangeHint.Text", language.text("range.hint"));
+        commands.set("#ActivationTitle.Text", language.text("activation.title"));
+        commands.set("#ControlsHint.Text", language.text("controls.hint"));
+        commands.set("#Defaults.Text", language.text("defaults"));
+        commands.set("#Clear.Text", language.text("clear"));
+        commands.set("#Cancel.Text", language.text("cancel"));
+        commands.set("#Save.Text", language.text("save"));
+        commands.set("#Filter.Text", language.text(selectedOnly ? "filter.all" : "filter.selected"));
+        commands.set("#BlocksTab.Text", language.text("tab.blocks") + " (" + blocks.size() + ")" + (toolMenu ? "" : " •"));
+        commands.set("#ToolsTab.Text", language.text("tab.tools") + " (" + tools.size() + ")" + (toolMenu ? " •" : ""));
+        commands.set("#CatalogTitle.Text", language.text(toolMenu ? "catalog.tools" : "catalog.blocks")
             + " (" + window.total() + ")");
-        commands.set("#ActivationName.Text", activation.label + " (");
+        commands.set("#ActivationName.Text", language.text("activation." + activation.name()) + " (");
         // HotkeyLabel resolve o atalho no cliente, acompanhando remapeamentos e controle.
         commands.set("#ActivationKey.InputBindingKey", activation.inputBinding);
-        commands.set("#Summary.Text", blocks.size() + " blocos · " + tools.size() + " ferramentas");
-        commands.set("#ActivationHint.Text", switch (activation) {
-            case CROUCH -> "Segure agachar ao minerar. Ao soltar, a mineração volta ao normal.";
-            case WALK -> "Ativa enquanto o jogo indica caminhar. Requer estar em movimento.";
-            case SPRINT -> "Ativa enquanto o jogo indica correr. Requer estar em movimento.";
-        });
-        commands.set("#Status.Text", status);
+        commands.set("#Summary.Text", language.text("summary", blocks.size(), tools.size()));
+        commands.set("#ActivationHint.Text", language.text("hint." + activation.name()));
+        commands.set("#Status.Text", language.text(statusKey));
     }
 
     private static void bind(UIEventBuilder events, String selector, String action) {
@@ -204,38 +216,38 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
             }
             case "Filter" -> { selectedOnly = !selectedOnly; refreshGrid = true; }
             case "Radius" -> {
-                if (validRadius(data.radius)) { radius = data.radius; status = "Distância alterada. Salve para aplicar."; }
-                else status = "Digite uma distância inteira de 1 a 32.";
+                if (validRadius(data.radius)) { radius = data.radius; statusKey = "status.range"; }
+                else statusKey = "status.invalidRange";
             }
             case "RadiusMinus", "RadiusPlus" -> {
                 radius = Math.clamp(radius + (data.action.equals("RadiusPlus") ? 1 : -1), 1, PlayerSettings.MAX_RADIUS);
                 commands.set("#Radius.Value", radius);
-                status = "Distância alterada. Salve para aplicar.";
+                statusKey = "status.range";
             }
             case "Activation" -> {
                 var values = PlayerSettings.Activation.values();
                 activation = values[(activation.ordinal() + 1) % values.length];
-                status = "Ativação alterada. Salve para aplicar.";
+                statusKey = "status.activation";
             }
             case "Clear" -> {
                 selection().clear(); refreshGrid = true;
-                status = toolMenu ? "Ferramentas desmarcadas no rascunho." : "Blocos desmarcados no rascunho.";
+                statusKey = toolMenu ? "status.clearTools" : "status.clearBlocks";
             }
             case "Defaults" -> {
                 selection().clear();
                 selection().addAll(toolMenu ? PlayerSettings.DEFAULT_TOOLS : PlayerSettings.DEFAULT_BLOCKS);
                 refreshGrid = true;
-                status = "Padrões desta lista restaurados no rascunho.";
+                statusKey = "status.defaults";
             }
             case "Save" -> {
-                if (!validRadius(data.radius)) { status = "Digite uma distância inteira de 1 a 32 antes de salvar."; break; }
+                if (!validRadius(data.radius)) { statusKey = "status.invalidSave"; break; }
                 radius = data.radius;
                 try {
                     settings.save(playerRef.getUuid(), new PlayerSettings(blocks, tools, radius, activation));
-                    playerRef.sendMessage(Message.raw("Advenced Vein Mining salvo: " + blocks.size() + " blocos, " + tools.size()
-                        + " ferramentas, alcance " + radius + ", ativação: " + activation.label + "."));
+                    playerRef.sendMessage(Message.raw(language.text("saved", blocks.size(), tools.size(), radius,
+                        language.text("activation." + activation.name()))));
                     dismissed = true; cancelPendingSearch(); close(); return;
-                } catch (IOException error) { status = "Não foi possível salvar. O rascunho continua neste menu."; }
+                } catch (IOException error) { statusKey = "status.saveError"; }
             }
             default -> {
                 if (data.action.startsWith("LoadAhead:")) {
@@ -258,7 +270,7 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
                 if (card != null) commands.set(card + " #Selected.Value", checked);
                 // Atualiza só a caixa marcada para conservar a posição de rolagem.
                 if (selectedOnly && tool == toolMenu) refreshGrid = true;
-                status = "Seleção alterada. Salve para aplicar.";
+                statusKey = "status.selection";
             }
         }
         if (refreshGrid) renderGrid(commands, events);

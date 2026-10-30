@@ -3,7 +3,7 @@ import java.util.Properties
 plugins { java }
 
 group = "br.pedro.hytale"
-version = "0.4.9"
+version = "0.5.0"
 
 java { toolchain { languageVersion.set(JavaLanguageVersion.of(25)) } }
 

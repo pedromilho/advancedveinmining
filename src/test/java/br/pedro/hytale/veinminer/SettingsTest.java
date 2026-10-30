@@ -8,6 +8,26 @@ import java.util.UUID;
 
 public final class SettingsTest {
     public static void main(String[] args) throws Exception {
+        for (String locale : new String[] {"pt", "pt-BR", "PT_br", " pt-PT ", "pt-AO"}) {
+            check(UiLanguage.from(locale) == UiLanguage.PORTUGUESE, "Detectar portugues: " + locale);
+        }
+        for (String locale : new String[] {null, "", "en-US", "en-GB", "es-ES", "fr-FR", "de-DE", "ja-JP", "ptx", "unknown"}) {
+            check(UiLanguage.from(locale) == UiLanguage.ENGLISH, "Usar ingles como fallback: " + locale);
+        }
+        check(UiLanguage.PORTUGUESE.keys().equals(UiLanguage.ENGLISH.keys()), "Ambos os idiomas cobrem todos os textos");
+        for (UiLanguage language : UiLanguage.values()) {
+            for (String key : language.keys()) {
+                check(!language.text(key, 5, 2, 8, "Crouch").isBlank(), "Traducao formatada valida: " + key);
+            }
+        }
+        check(UiLanguage.PORTUGUESE.text("activation.CROUCH").equals("Agachar"), "Acao em portugues");
+        check(UiLanguage.ENGLISH.text("activation.CROUCH").equals("Crouch"), "Acao em ingles");
+        check(UiLanguage.PORTUGUESE.text("status.pending").contains("Alterações"), "Preservar acentos UTF-8");
+        check(UiLanguage.ENGLISH.text("summary", 5, 2).equals("5 blocks · 2 tools"), "Resumo em ingles com contagem");
+        check(UiLanguage.PORTUGUESE.text("saved", 5, 2, 8, "Agachar").contains("ativação: Agachar"), "Mensagem salva localizada");
+        check(UiLanguage.from("fr-FR").assetLocale.equals("en-US"), "Nomes do catalogo usam ingles para outros idiomas");
+        check(UiLanguage.from("pt-PT").assetLocale.equals("pt-BR"), "Nomes portugueses usam assets portugueses disponiveis");
+
         PlayerSettings defaults = PlayerSettings.defaults();
         check(defaults.activation() == PlayerSettings.Activation.CROUCH, "Agachar por padrao");
         check(defaults.radius() == 8 && !defaults.blocks().isEmpty(), "Padrao preserva minerios");

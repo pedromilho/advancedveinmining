@@ -25,8 +25,8 @@ record PlayerSettings(Set<String> blocks, Set<String> tools, int radius, Activat
     PlayerSettings {
         blocks = Set.copyOf(blocks);
         tools = Set.copyOf(tools);
-        if (radius < 1 || radius > MAX_RADIUS) throw new IllegalArgumentException("Distancia deve ser de 1 a 32.");
-        if (activation == null) throw new IllegalArgumentException("Escolha uma acao de ativacao.");
+        if (radius < 1 || radius > MAX_RADIUS) throw new IllegalArgumentException("Distance must be between 1 and 32.");
+        if (activation == null) throw new IllegalArgumentException("Choose an activation action.");
     }
 
     static PlayerSettings defaults() {
@@ -41,11 +41,10 @@ record PlayerSettings(Set<String> blocks, Set<String> tools, int radius, Activat
     boolean allowsTool(String itemId, boolean broken) { return !broken && tools.contains(itemId); }
 
     enum Activation {
-        CROUCH("Agachar", "Crouch"), WALK("Caminhar", "Walk"), SPRINT("Correr", "Sprint");
-        final String label;
+        CROUCH("Crouch"), WALK("Walk"), SPRINT("Sprint");
         final String inputBinding;
 
-        Activation(String label, String inputBinding) { this.label = label; this.inputBinding = inputBinding; }
+        Activation(String inputBinding) { this.inputBinding = inputBinding; }
 
         boolean active(boolean crouching, boolean forcedCrouching, boolean walking, boolean sprinting) {
             return switch (this) {

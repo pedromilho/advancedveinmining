@@ -1,4 +1,4 @@
-Compatível com **Hytale 0.7.5**.
+Compatible with **Hytale 0.7.5**.
 
 ```text
 /veinminer

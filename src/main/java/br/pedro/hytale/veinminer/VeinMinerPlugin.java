@@ -26,7 +26,7 @@ public final class VeinMinerPlugin extends JavaPlugin {
         mining = new VeinMiningSystem(settings);
         getEntityStoreRegistry().registerSystem(mining);
         getCommandRegistry().registerCommand(new SettingsCommand(settings));
-        getLogger().atInfo().log("Advenced Vein Mining 0.4.9 carregado. Use /veinminer para configurar.");
+        getLogger().atInfo().log("Advenced Vein Mining 0.5.0 loaded. Use /veinminer to configure.");
     }
 
     @Override
@@ -38,7 +38,7 @@ public final class VeinMinerPlugin extends JavaPlugin {
         private final SettingsRepository settings;
 
         SettingsCommand(SettingsRepository settings) {
-            super("veinminer", "Abre as configuracoes pessoais do Advenced Vein Mining.");
+            super("veinminer", "server.advancedVeinMining.commands.settings.description");
             addAliases("advancedveinminer", "advancedveinmining", "veinmining");
             this.settings = settings;
             requireNoPermission();
