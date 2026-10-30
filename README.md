@@ -1,4 +1,4 @@
-# Advenced Vein Mining
+# Advanced Vein Mining
 
 Open the settings menu with any of these commands:
 
