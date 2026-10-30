@@ -1,0 +1,108 @@
+$C = "../Common.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 980, Height: 680);
+  #Title { $C.@Title { @Text = "ADVENCED VEIN MINING · CONFIGURAÇÕES"; } }
+  #Content {
+    Padding: (Full: 20);
+    LayoutMode: Top;
+    Group {
+      Anchor: (Height: 520);
+      LayoutMode: Left;
+      Group {
+        Anchor: (Width: 630, Right: 20);
+        LayoutMode: Top;
+        Group {
+          Anchor: (Height: 36, Bottom: 8);
+          LayoutMode: Left;
+          $C.@SmallSecondaryTextButton #BlocksTab { Anchor: (Width: 220, Height: 34, Right: 8); Text: "Blocos"; }
+          $C.@SmallSecondaryTextButton #ToolsTab { Anchor: (Width: 270, Height: 34); Text: "Ferramentas"; }
+        }
+        $C.@TextField #Search {
+          Anchor: (Height: 38, Bottom: 8);
+          PlaceholderText: "Buscar por nome ou ID...";
+        }
+        Group {
+          Anchor: (Height: 28, Bottom: 8);
+          LayoutMode: Left;
+          Label #CatalogTitle {
+            FlexWeight: 1;
+            Style: (FontSize: 14, RenderBold: true, TextColor: #d3dee3, VerticalAlignment: Center);
+          }
+          $C.@SmallSecondaryTextButton #Filter { Anchor: (Width: 180, Height: 26); Text: "Somente marcados"; }
+        }
+        Group #CatalogScroll {
+          FlexWeight: 1;
+          LayoutMode: TopScrolling;
+          ScrollbarStyle: $C.@DefaultScrollbarStyle;
+          Group #Grid { LayoutMode: Top; }
+        }
+      }
+      Group {
+        FlexWeight: 1;
+        LayoutMode: Top;
+        Label {
+          Anchor: (Height: 30);
+          Text: "ALCANCE E ATIVAÇÃO";
+          Style: (FontSize: 16, RenderBold: true, TextColor: #d3dee3);
+        }
+        Label { Text: "Distância máxima (blocos)"; Anchor: (Height: 26); Style: (FontSize: 14, TextColor: #d3dee3); }
+        Group {
+          LayoutMode: Left;
+          Anchor: (Height: 38);
+          $C.@SmallSecondaryTextButton #RadiusMinus { Anchor: (Width: 36, Height: 36, Right: 8); Text: "-"; }
+          $C.@NumberField #Radius {
+            FlexWeight: 1;
+            Anchor: (Height: 36, Right: 8);
+            Format: (MaxDecimalPlaces: 0, Step: 1, MinValue: 1, MaxValue: 32);
+            Value: 8;
+          }
+          $C.@SmallSecondaryTextButton #RadiusPlus { Anchor: (Width: 36, Height: 36); Text: "+"; }
+        }
+        Label {
+          Anchor: (Height: 48, Top: 8, Bottom: 12);
+          Text: "Digite de 1 a 32. O raio parte do bloco inicial. Até 32 blocos por veio.";
+          Style: (FontSize: 13, Wrap: true, TextColor: #a8b6c6);
+        }
+        Label { Text: "Ação para ativar"; Anchor: (Height: 26); Style: (FontSize: 14, TextColor: #d3dee3); }
+        Button #Activation {
+          Anchor: (Height: 38);
+          LayoutMode: Left;
+          Padding: (Horizontal: 12, Vertical: 8);
+          Background: #25364a;
+          Style: (Hovered: (Background: #30465e), Pressed: (Background: #3b536b));
+          Label #ActivationName { Style: (FontSize: 14, VerticalAlignment: Center, TextColor: #d3dee3); }
+          HotkeyLabel #ActivationKey {
+            InputBindingKey: "Crouch";
+          }
+          Label { Text: ")"; Style: (FontSize: 14, VerticalAlignment: Center, TextColor: #d3dee3); }
+          Group { FlexWeight: 1; }
+          Label { Text: ">"; Style: (FontSize: 14, VerticalAlignment: Center, TextColor: #d3dee3); }
+        }
+        Label #ActivationHint { Anchor: (Height: 56, Top: 8); Style: (FontSize: 14, Wrap: true, TextColor: #d3dee3); }
+        Label {
+          Anchor: (Height: 68, Bottom: 12);
+          Text: "A tecla exibida segue seus controles. Use agachar no modo segurar. Caminhar/correr exigem movimento.";
+          Style: (FontSize: 12, Wrap: true, TextColor: #a8b6c6);
+        }
+        Label #Summary { Anchor: (Height: 38); Style: (FontSize: 13, Wrap: true, TextColor: #d3dee3); }
+        Group {
+          Anchor: (Height: 32);
+          LayoutMode: Left;
+          $C.@SmallSecondaryTextButton #Defaults { FlexWeight: 1; Anchor: (Height: 30, Right: 8); Text: "Padrões"; }
+          $C.@SmallSecondaryTextButton #Clear { FlexWeight: 1; Anchor: (Height: 30); Text: "Limpar"; }
+        }
+        Label #Status { Anchor: (Height: 52, Top: 8); Style: (FontSize: 12, Wrap: true, TextColor: #e9c77b); }
+      }
+    }
+    Group {
+      Anchor: (Height: 44, Top: 12);
+      LayoutMode: Left;
+      Group { FlexWeight: 1; }
+      $C.@SmallSecondaryTextButton #Cancel { Anchor: (Width: 110, Height: 40, Left: 12, Right: 8); Text: "Cancelar"; }
+      $C.@TextButton #Save { Anchor: (Width: 180, Height: 40); Text: "Salvar e fechar"; }
+    }
+  }
+}
