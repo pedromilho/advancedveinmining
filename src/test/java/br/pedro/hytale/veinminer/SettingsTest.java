@@ -68,6 +68,22 @@ public final class SettingsTest {
         check(repository.get(second).equals(defaults), "Isolar jogadores");
         var restarted = new SettingsRepository(root, warnings::add);
         check(restarted.get(first).equals(chosen), "Persistir entre reinicios");
+        var modesDraft = new java.util.HashMap<String, PlayerSettings.ToolBlockMode>();
+        modesDraft.put("OtherMod:Pickaxe", PlayerSettings.ToolBlockMode.ALL);
+        modesDraft.put("OtherMod:Hatchet", PlayerSettings.ToolBlockMode.LOGS);
+        var perTool = new PlayerSettings(chosen.blocks(), chosen.tools(), chosen.radius(), chosen.activation(), modesDraft);
+        modesDraft.clear();
+        repository.save(first, perTool);
+        check(new SettingsRepository(root, warnings::add).get(first).equals(perTool), "Persist tool modes, including mod IDs");
+        check(perTool.modeFor("OtherMod:Pickaxe", PlayerSettings.ToolBlockMode.ORES) == PlayerSettings.ToolBlockMode.ALL, "Explicit setting overrides inferred type");
+        check(perTool.modeFor("NewMod:Hatchet", PlayerSettings.ToolBlockMode.LOGS) == PlayerSettings.ToolBlockMode.LOGS, "New tools inherit detected type");
+        check(PlayerSettings.ToolBlockMode.ORES.allows(true, false), "Pickaxe accepts ores");
+        check(!PlayerSettings.ToolBlockMode.ORES.allows(false, true), "Pickaxe rejects logs");
+        check(PlayerSettings.ToolBlockMode.LOGS.allows(false, true), "Hatchet accepts logs");
+        check(!PlayerSettings.ToolBlockMode.LOGS.allows(true, false), "Hatchet rejects ores");
+        check(!PlayerSettings.ToolBlockMode.LOGS.allows(false, false), "Logs excludes planks and other blocks");
+        check(PlayerSettings.ToolBlockMode.ALL.allows(false, false), "All accepts other selected blocks");
+        check(new SettingsRepository(root.resolve("dynamic"), warnings::add, () -> perTool).get(second).equals(perTool), "New player defaults come from registered assets");
         var empty = new PlayerSettings(Set.of(), Set.of(), 32, PlayerSettings.Activation.CROUCH);
         restarted.save(first, empty);
         check(new SettingsRepository(root, warnings::add).get(first).equals(empty), "Lista vazia permanece vazia");
@@ -79,6 +95,47 @@ public final class SettingsTest {
         check(migrated.tools().equals(PlayerSettings.DEFAULT_TOOLS), "Config antiga recebe picaretas padrao");
         check(migrated.radius() == 5 && migrated.activation() == PlayerSettings.Activation.SPRINT
             && migrated.blocks().equals(Set.of("Ore_Copper_Stone")), "Migracao preserva as escolhas antigas");
+
+        // Upgrades must enable every discovered hatchet/log once, including later mod additions.
+        var automatic = new PlayerSettings(Set.of("Mod:Tree_Log", "Wood_Beech_Trunk"),
+            Set.of("Mod:Hatchet", "Tool_Hatchet_Mithril"), 8, PlayerSettings.Activation.CROUCH);
+        var migratedRepo = new SettingsRepository(root, warnings::add, PlayerSettings::defaults, () -> automatic);
+        var upgraded = migratedRepo.get(legacy);
+        check(upgraded.tools().containsAll(automatic.tools()) && upgraded.blocks().containsAll(automatic.blocks()), "Old settings receive all discovered hatchets and logs automatically");
+        check(upgraded.modeFor("Mod:Hatchet", PlayerSettings.ToolBlockMode.ALL) == PlayerSettings.ToolBlockMode.LOGS, "New mod hatchet defaults to logs");
+        check(upgraded.radius() == 5 && upgraded.activation() == PlayerSettings.Activation.SPRINT, "Migration preserves range and controls");
+        check(new SettingsRepository(root, warnings::add, PlayerSettings::defaults, () -> automatic).get(legacy).equals(upgraded), "Migration is persisted without opening settings");
+        var manualModes = new java.util.HashMap<>(upgraded.toolModes());
+        manualModes.put("Tool_Hatchet_Mithril", PlayerSettings.ToolBlockMode.ORES);
+        var manual = new PlayerSettings(Set.of("Ore_Copper_Stone"), Set.of("Tool_Hatchet_Mithril"), 5, upgraded.activation(), manualModes);
+        migratedRepo.save(legacy, manual);
+        check(new SettingsRepository(root, warnings::add, PlayerSettings::defaults, () -> automatic).get(legacy).equals(manual), "Manual ore restriction and disabled tools/logs survive restart");
+        var additionalMod = new PlayerSettings(Set.of("Mod:Tree_Log", "Wood_Beech_Trunk", "NewMod:Tree_Log"),
+            Set.of("Mod:Hatchet", "Tool_Hatchet_Mithril", "NewMod:Hatchet"), 8, PlayerSettings.Activation.CROUCH);
+        var withNewMod = new SettingsRepository(root, warnings::add, PlayerSettings::defaults, () -> additionalMod).get(legacy);
+        check(withNewMod.tools().contains("NewMod:Hatchet") && withNewMod.blocks().contains("NewMod:Tree_Log"), "Newly installed mods receive log defaults");
+        check(!withNewMod.tools().contains("Mod:Hatchet") && !withNewMod.blocks().contains("Mod:Tree_Log"), "New mod does not re-enable manually disabled existing entries");
+        check(withNewMod.modeFor("Tool_Hatchet_Mithril", PlayerSettings.ToolBlockMode.LOGS) == PlayerSettings.ToolBlockMode.ORES, "Detected defaults never overwrite explicit ore mode");
+
+        var automaticOres = new PlayerSettings(Set.of("Mod:Ruby_Ore", "Ore_Copper_Stone"),
+            Set.of("Mod:Ruby_Pickaxe", "Tool_Pickaxe_Copper"), 8, PlayerSettings.Activation.CROUCH);
+        var oreRepo = new SettingsRepository(root, warnings::add, PlayerSettings::defaults, () -> additionalMod, () -> automaticOres);
+        var oresUpgraded = oreRepo.get(legacy);
+        check(oresUpgraded.tools().containsAll(automaticOres.tools()) && oresUpgraded.blocks().containsAll(automaticOres.blocks()), "Existing players automatically receive all detected pickaxes and ores");
+        check(oresUpgraded.modeFor("Mod:Ruby_Pickaxe", PlayerSettings.ToolBlockMode.ALL) == PlayerSettings.ToolBlockMode.ORES, "Mod pickaxe defaults to ores only");
+        check(!oresUpgraded.tools().contains("Mod:Hatchet") && !oresUpgraded.blocks().contains("Mod:Tree_Log"), "Ore upgrade preserves disabled hatchets and logs");
+        var disabledOreModes = new java.util.HashMap<>(oresUpgraded.toolModes());
+        disabledOreModes.put("Tool_Pickaxe_Copper", PlayerSettings.ToolBlockMode.ALL);
+        var oreManual = new PlayerSettings(Set.of(), Set.of("Tool_Pickaxe_Copper"), 11, PlayerSettings.Activation.WALK, disabledOreModes);
+        oreRepo.save(legacy, oreManual);
+        check(new SettingsRepository(root, warnings::add, PlayerSettings::defaults, () -> additionalMod, () -> automaticOres).get(legacy).equals(oreManual), "Manual pickaxe mode and disabled ores survive restart");
+        var newOreMod = new PlayerSettings(Set.of("Mod:Ruby_Ore", "Ore_Copper_Stone", "NewMod:Sapphire_Ore"),
+            Set.of("Mod:Ruby_Pickaxe", "Tool_Pickaxe_Copper", "NewMod:Sapphire_Pickaxe"), 8, PlayerSettings.Activation.CROUCH);
+        var oreModInstalled = new SettingsRepository(root, warnings::add, PlayerSettings::defaults, () -> additionalMod, () -> newOreMod).get(legacy);
+        check(oreModInstalled.tools().contains("NewMod:Sapphire_Pickaxe") && oreModInstalled.blocks().contains("NewMod:Sapphire_Ore"), "Later mods automatically enable new pickaxes and ores");
+        check(!oreModInstalled.tools().contains("Mod:Ruby_Pickaxe") && !oreModInstalled.blocks().contains("Mod:Ruby_Ore"), "New mod preserves manually disabled existing pickaxes and ores");
+        check(oreModInstalled.modeFor("Tool_Pickaxe_Copper", PlayerSettings.ToolBlockMode.ORES) == PlayerSettings.ToolBlockMode.ALL, "New mod preserves explicit pickaxe type override");
+        check(oreModInstalled.radius() == 11 && oreModInstalled.activation() == PlayerSettings.Activation.WALK, "Ore detection preserves range and activation");
 
         String localized = CatalogSearch.normalize("Ore_Copper_Stone Minério de Cobre em Pedra");
         check(CatalogSearch.matches(localized, CatalogSearch.normalize("MINERIO COBRE")), "Buscar sem acentos e sem diferenciar maiusculas");

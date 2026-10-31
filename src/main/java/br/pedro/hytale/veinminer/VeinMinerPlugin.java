@@ -22,11 +22,11 @@ public final class VeinMinerPlugin extends JavaPlugin {
     protected void setup() {
         // Mantém o local original para preservar as preferências após renomear o plugin.
         var settings = new SettingsRepository(getDataDirectory().resolveSibling("Pedro_VeinMiner").resolve("players"),
-            message -> getLogger().atWarning().log(message));
+            message -> getLogger().atWarning().log(message), AssetRules::defaults, AssetRules::hatchetDefaults, AssetRules::pickaxeDefaults);
         mining = new VeinMiningSystem(settings);
         getEntityStoreRegistry().registerSystem(mining);
         getCommandRegistry().registerCommand(new SettingsCommand(settings));
-        getLogger().atInfo().log("Advenced Vein Mining 0.5.0 loaded. Use /veinminer to configure.");
+        getLogger().atInfo().log("Advenced Vein Mining 0.6.0 loaded. Use /veinminer to configure.");
     }
 
     @Override

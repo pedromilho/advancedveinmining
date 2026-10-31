@@ -53,7 +53,7 @@ final class VeinMiningSystem extends EntityEventSystem<EntityStore, BreakBlockEv
         UUID uuid = chunk.getComponent(index, PlayerRef.getComponentType()).getUuid();
         PlayerSettings config = settings.get(uuid);
         if (!usableTool(tool, config)) return;
-        if (!config.blocks().contains(event.getBlockType().getId())) return;
+        if (!AssetRules.allows(config, tool.getItem(), event.getBlockType())) return;
         Ref<EntityStore> player = chunk.getReferenceTo(index);
         if (!activationHeld(player, buffer, config) || !busy.add(uuid)) return;
         World world = store.getExternalData().getWorld();
@@ -69,9 +69,10 @@ final class VeinMiningSystem extends EntityEventSystem<EntityStore, BreakBlockEv
                     var chunks = world.getChunkStore();
                     if (blockAt(chunks, origin) != BlockType.EMPTY_ID) return;
                     var entities = world.getEntityStore().getStore();
+                    var drops = new DropRedirector(entities, origin);
                     VeinTraversal.mine(origin, LIMIT,
                         p -> VeinTraversal.withinRadius(origin, p, config.radius()) && matches(chunks, p, blockId),
-                        p -> breakExtra(player, entities, chunks, p, tool, blockId, config),
+                        p -> breakExtra(player, entities, chunks, p, tool, blockId, drops),
                         () -> canContinue(player, entities, config)
                             && sameTool(InventoryComponent.getItemInHand(entities, player), tool, config));
                 } finally {
@@ -119,18 +120,26 @@ final class VeinMiningSystem extends EntityEventSystem<EntityStore, BreakBlockEv
         return type != null && blockId.equals(type.getId());
     }
 
-    private static boolean breakExtra(Ref<EntityStore> player, Store<EntityStore> entities,
+    private PlayerSettings settingsForPlayer(Store<EntityStore> entities, Ref<EntityStore> player) {
+        return settings.get(entities.getComponent(player, PlayerRef.getComponentType()).getUuid());
+    }
+
+    private boolean breakExtra(Ref<EntityStore> player, Store<EntityStore> entities,
                                       ChunkStore chunks, VeinTraversal.Position p,
-                                      ItemStack original, String blockId, PlayerSettings config) {
+                                      ItemStack original, String blockId,
+                                      ComponentAccessor<EntityStore> drops) {
         ItemStack current = InventoryComponent.getItemInHand(entities, player);
-        if (!sameTool(current, original, config) || !matches(chunks, p, blockId)) return false;
+        PlayerSettings latest = settingsForPlayer(entities, player);
+        if (!sameTool(current, original, latest) || !matches(chunks, p, blockId)) return false;
+        BlockType block = BlockType.getAssetMap().getAsset(blockAt(chunks, p));
+        if (block == null || !AssetRules.allows(latest, current.getItem(), block)) return false;
         Ref<ChunkStore> section = chunks.getChunkSectionReferenceAtBlock(p.x(), p.y(), p.z());
         if (section == null || !section.isValid()) return false;
         // Uma batida acelerada por bloco; o jogo calcula drops, desgaste e eventos canceláveis.
         // Não substituímos os blocos diretamente por ar.
         boolean broken = BlockHarvestUtils.performBlockDamage(player, player,
             new Vector3i(p.x(), p.y(), p.z()), current, null, null, false,
-            1_000_000.0f, 0, false, section, entities, chunks.getStore());
+            1_000_000.0f, 0, false, section, drops, chunks.getStore());
         return broken && blockAt(chunks, p) == BlockType.EMPTY_ID;
     }
 }

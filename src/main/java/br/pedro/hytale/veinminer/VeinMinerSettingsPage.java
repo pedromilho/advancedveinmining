@@ -13,6 +13,7 @@ import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
 import com.hypixel.hytale.server.core.modules.i18n.I18nModule;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
+import com.hypixel.hytale.server.core.ui.Value;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -41,10 +42,22 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
     private final Set<String> allowedBlocks = new HashSet<>();
     private final Set<String> allowedTools = new HashSet<>();
     private final Map<String, String> visibleCards = new HashMap<>();
+    private final Map<String, PlayerSettings.ToolBlockMode> toolModes = new HashMap<>();
+    private String editingTool;
     private int radius;
     private PlayerSettings.Activation activation;
     private String search = "";
-    private boolean selectedOnly;
+    private enum SelectionFilter {
+        ALL, SELECTED, UNSELECTED;
+
+        boolean matches(boolean selected) {
+            return this == ALL || (this == SELECTED ? selected : !selected);
+        }
+
+        SelectionFilter next() { return values()[(ordinal() + 1) % values().length]; }
+    }
+
+    private SelectionFilter selectionFilter = SelectionFilter.ALL;
     private boolean toolMenu;
     private ScheduledFuture<?> pendingSearch;
     private long searchRevision;
@@ -58,6 +71,7 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
         PlayerSettings current = settings.get(playerRef.getUuid());
         blocks = new HashSet<>(current.blocks());
         tools = new HashSet<>(current.tools());
+        toolModes.putAll(current.toolModes());
         radius = current.radius();
         activation = current.activation();
         blockCatalog = BlockType.getAssetMap().getAssetMap().values().stream()
@@ -98,13 +112,13 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
         events.addEventBinding(CustomUIEventBindingType.ValueChanged, "#Radius",
             EventData.of("Action", "Radius").append("@Radius", "#Radius.Value"), false);
         for (String action : List.of("BlocksTab", "ToolsTab", "Filter", "RadiusMinus", "RadiusPlus",
-                "Activation", "Defaults", "Clear", "Cancel")) bind(events, "#" + action, action);
+                "Activation", "Defaults", "Clear", "Cancel", "General")) bind(events, "#" + action, action);
         // Lê também o valor atual ao salvar, mesmo sem sair do campo numérico.
         events.addEventBinding(CustomUIEventBindingType.Activating, "#Save",
             EventData.of("Action", "Save").append("@Radius", "#Radius.Value"));
         commands.set("#Radius.Value", radius);
         renderGrid(commands, events);
-        renderControls(commands);
+        renderControls(commands, events);
     }
 
     private Set<String> selection() { return toolMenu ? tools : blocks; }
@@ -113,7 +127,7 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
         cancelPendingSearch();
         String[] words = CatalogSearch.words(search);
         List<Entry> filtered = catalog().stream()
-            .filter(e -> !selectedOnly || selection().contains(e.id()))
+            .filter(e -> selectionFilter.matches(selection().contains(e.id())))
             .filter(e -> CatalogSearch.matches(e.search(), words)).toList();
         commands.clear("#Grid");
         visibleCards.clear();
@@ -142,7 +156,8 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
             commands.set(card + " #Name.Text", entry.name());
             commands.set(card + " #Id.Text", entry.id());
             commands.set(card + " #Selected.Value", selection().contains(entry.id()));
-            bind(events, card + " #Toggle", "Toggle:" + key);
+            selectedCard(commands, card, selection().contains(entry.id()));
+            bind(events, card + " #Toggle", (toolMenu ? "Edit:" : "Toggle:") + key);
             events.addEventBinding(CustomUIEventBindingType.ValueChanged, card + " #Selected",
                 EventData.of("Action", "Select:" + key).append("@Selected", card + " #Selected.Value"));
             if (window.hasMore() && i >= window.loaded() - COLUMNS * 2) {
@@ -152,7 +167,34 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
         }
     }
 
-    private void renderControls(UICommandBuilder commands) {
+    private void renderControls(UICommandBuilder commands, UIEventBuilder events) {
+        commands.set("#GeneralSettings.Visible", editingTool == null);
+        commands.set("#ToolSettings.Visible", editingTool != null);
+        if (editingTool != null) {
+            for (String action : List.of("ModeOres", "ModeLogs", "ModeAll")) {
+                events.addEventBinding(CustomUIEventBindingType.Activating, "#" + action,
+                    EventData.of("Action", action).append("Tool", editingTool));
+            }
+            events.addEventBinding(CustomUIEventBindingType.ValueChanged, "#ToolEnabled",
+                EventData.of("Action", "ToolEnabled").append("Tool", editingTool)
+                    .append("@Selected", "#ToolEnabled.Value"));
+            Item item = Item.getAssetMap().getAsset(editingTool);
+            var mode = toolModes.getOrDefault(editingTool, AssetRules.defaultMode(item));
+            commands.set("#ToolHeading.Text", language.text("tool.heading"));
+            commands.set("#ToolPreview.ItemId", editingTool);
+            commands.set("#ToolName.Text", entry(editingTool, item).name());
+            commands.set("#ToolEnabled.Value", tools.contains(editingTool));
+            commands.set("#ToolEnabledLabel.Text", language.text("tool.enabled"));
+            commands.set("#ToolTypeLabel.Text", language.text("tool.type"));
+            commands.set("#ToolHint.Text", language.text("tool.hint"));
+            commands.set("#General.Text", language.text("tool.general"));
+            commands.set("#ModeOres.Text", language.text("tool.ores"));
+            selectedButton(commands, "#ModeOres", mode == PlayerSettings.ToolBlockMode.ORES);
+            commands.set("#ModeLogs.Text", language.text("tool.logs"));
+            selectedButton(commands, "#ModeLogs", mode == PlayerSettings.ToolBlockMode.LOGS);
+            commands.set("#ModeAll.Text", language.text("tool.all"));
+            selectedButton(commands, "#ModeAll", mode == PlayerSettings.ToolBlockMode.ALL);
+        }
         commands.set("#PageHeading.Text", language.text("title"));
         commands.set("#Search.PlaceholderText", language.text("search"));
         commands.set("#RangeSection.Text", language.text("range.section"));
@@ -164,9 +206,11 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
         commands.set("#Clear.Text", language.text("clear"));
         commands.set("#Cancel.Text", language.text("cancel"));
         commands.set("#Save.Text", language.text("save"));
-        commands.set("#Filter.Text", language.text(selectedOnly ? "filter.all" : "filter.selected"));
-        commands.set("#BlocksTab.Text", language.text("tab.blocks") + " (" + blocks.size() + ")" + (toolMenu ? "" : " •"));
-        commands.set("#ToolsTab.Text", language.text("tab.tools") + " (" + tools.size() + ")" + (toolMenu ? " •" : ""));
+        selectedButton(commands, "#BlocksTab", !toolMenu);
+        selectedButton(commands, "#ToolsTab", toolMenu);
+        commands.set("#Filter.Text", language.text("filter.mode." + selectionFilter.name()));
+        commands.set("#BlocksTab.Text", language.text("tab.blocks") + " (" + blocks.size() + ")");
+        commands.set("#ToolsTab.Text", language.text("tab.tools") + " (" + tools.size() + ")");
         commands.set("#CatalogTitle.Text", language.text(toolMenu ? "catalog.tools" : "catalog.blocks")
             + " (" + window.total() + ")");
         commands.set("#ActivationName.Text", language.text("activation." + activation.name()) + " (");
@@ -175,6 +219,17 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
         commands.set("#Summary.Text", language.text("summary", blocks.size(), tools.size()));
         commands.set("#ActivationHint.Text", language.text("hint." + activation.name()));
         commands.set("#Status.Text", language.text(statusKey));
+    }
+
+    private static void selectedButton(UICommandBuilder commands, String selector, boolean selected) {
+        commands.set(selector + ".Style", selected
+            ? Value.ref("Pages/VeinMinerSettings.ui", "SelectedButtonStyle")
+            : Value.ref("Common.ui", "SmallSecondaryTextButtonStyle"));
+    }
+
+    private static void selectedCard(UICommandBuilder commands, String card, boolean selected) {
+        commands.set(card + " #Toggle.Style", Value.ref("Pages/VeinMinerSettings.ui",
+            selected ? "SelectedCardButtonStyle" : "CardButtonStyle"));
     }
 
     private static void bind(UIEventBuilder events, String selector, String action) {
@@ -198,7 +253,7 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
                 var searchCommands = new UICommandBuilder();
                 var searchEvents = new UIEventBuilder();
                 renderGrid(searchCommands, searchEvents);
-                renderControls(searchCommands);
+                renderControls(searchCommands, searchEvents);
                 sendUpdate(searchCommands, searchEvents, false);
             }, 200, TimeUnit.MILLISECONDS);
             sendUpdate();
@@ -210,11 +265,35 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
         switch (data.action) {
             case "BlocksTab", "ToolsTab" -> {
                 toolMenu = data.action.equals("ToolsTab");
-                search = ""; selectedOnly = false;
+                editingTool = null;
+                search = ""; selectionFilter = SelectionFilter.ALL;
                 commands.set("#Search.Value", "");
                 refreshGrid = true;
             }
-            case "Filter" -> { selectedOnly = !selectedOnly; refreshGrid = true; }
+            case "General" -> editingTool = null;
+            case "ModeOres", "ModeLogs", "ModeAll" -> {
+                if (data.tool != null && allowedTools.contains(data.tool)) {
+                    toolModes.put(data.tool, switch (data.action) {
+                        case "ModeOres" -> PlayerSettings.ToolBlockMode.ORES;
+                        case "ModeLogs" -> PlayerSettings.ToolBlockMode.LOGS;
+                        default -> PlayerSettings.ToolBlockMode.ALL;
+                    });
+                    statusKey = "status.selection";
+                }
+            }
+            case "ToolEnabled" -> {
+                if (data.tool != null && allowedTools.contains(data.tool)) {
+                    if (Boolean.TRUE.equals(data.selected)) tools.add(data.tool); else tools.remove(data.tool);
+                    String card = visibleCards.get("Tool:" + data.tool);
+                    if (card != null) {
+                        commands.set(card + " #Selected.Value", tools.contains(data.tool));
+                        selectedCard(commands, card, tools.contains(data.tool));
+                    }
+                    if (selectionFilter != SelectionFilter.ALL) refreshGrid = true;
+                    statusKey = "status.selection";
+                }
+            }
+            case "Filter" -> { selectionFilter = selectionFilter.next(); refreshGrid = true; }
             case "Radius" -> {
                 if (validRadius(data.radius)) { radius = data.radius; statusKey = "status.range"; }
                 else statusKey = "status.invalidRange";
@@ -235,7 +314,9 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
             }
             case "Defaults" -> {
                 selection().clear();
-                selection().addAll(toolMenu ? PlayerSettings.DEFAULT_TOOLS : PlayerSettings.DEFAULT_BLOCKS);
+                var defaults = AssetRules.defaults();
+                selection().addAll(toolMenu ? defaults.tools() : defaults.blocks());
+                if (toolMenu) toolModes.clear();
                 refreshGrid = true;
                 statusKey = "status.defaults";
             }
@@ -243,7 +324,7 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
                 if (!validRadius(data.radius)) { statusKey = "status.invalidSave"; break; }
                 radius = data.radius;
                 try {
-                    settings.save(playerRef.getUuid(), new PlayerSettings(blocks, tools, radius, activation));
+                    settings.save(playerRef.getUuid(), new PlayerSettings(blocks, tools, radius, activation, toolModes));
                     playerRef.sendMessage(Message.raw(language.text("saved", blocks.size(), tools.size(), radius,
                         language.text("activation." + activation.name()))));
                     dismissed = true; cancelPendingSearch(); close(); return;
@@ -254,6 +335,11 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
                     if (!window.acceptsCursor(data.action.substring("LoadAhead:".length()))) { sendUpdate(); return; }
                     if (pendingSearch != null) refreshGrid = true;
                     else appendBatch(commands, events);
+                    break;
+                }
+                if (data.action.startsWith("Edit:Tool:")) {
+                    String id = data.action.substring("Edit:Tool:".length());
+                    if (toolMenu && allowedTools.contains(id)) editingTool = id;
                     break;
                 }
                 boolean toggle = data.action.startsWith("Toggle:");
@@ -267,14 +353,17 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
                 boolean checked = toggle ? !chosen.contains(id) : Boolean.TRUE.equals(data.selected);
                 if (checked) chosen.add(id); else chosen.remove(id);
                 String card = visibleCards.get(key);
-                if (card != null) commands.set(card + " #Selected.Value", checked);
+                if (card != null) {
+                    commands.set(card + " #Selected.Value", checked);
+                    selectedCard(commands, card, checked);
+                }
                 // Atualiza só a caixa marcada para conservar a posição de rolagem.
-                if (selectedOnly && tool == toolMenu) refreshGrid = true;
+                if (selectionFilter != SelectionFilter.ALL && tool == toolMenu) refreshGrid = true;
                 statusKey = "status.selection";
             }
         }
         if (refreshGrid) renderGrid(commands, events);
-        renderControls(commands);
+        renderControls(commands, events);
         sendUpdate(commands, events, false);
     }
 
@@ -295,11 +384,13 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
     public static final class Data {
         public static final BuilderCodec<Data> CODEC = BuilderCodec.builder(Data.class, Data::new)
             .append(new KeyedCodec<>("Action", Codec.STRING), (d, v) -> d.action = v, d -> d.action).add()
+            .append(new KeyedCodec<>("Tool", Codec.STRING), (d, v) -> d.tool = v, d -> d.tool).add()
             .append(new KeyedCodec<>("@Search", Codec.STRING), (d, v) -> d.search = v, d -> d.search).add()
             .append(new KeyedCodec<>("@Radius", Codec.INTEGER), (d, v) -> d.radius = v, d -> d.radius).add()
             .append(new KeyedCodec<>("@Selected", Codec.BOOLEAN), (d, v) -> d.selected = v, d -> d.selected).add()
             .build();
         private String action;
+        private String tool;
         private String search;
         private Integer radius;
         private Boolean selected;

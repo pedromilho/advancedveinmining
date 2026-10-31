@@ -1,5 +1,23 @@
 $C = "../Common.ui";
 
+// Selected uses the native disabled appearance while all button states remain interactive.
+@SelectedButtonStyle = TextButtonStyle(
+  Default: (Background: PatchStyle(TexturePath: "../Common/Buttons/Disabled.png", Border: $C.@ButtonBorder), LabelStyle: $C.@SmallButtonDisabledLabelStyle),
+  Hovered: (Background: PatchStyle(TexturePath: "../Common/Buttons/Disabled.png", Border: $C.@ButtonBorder), LabelStyle: $C.@SmallButtonDisabledLabelStyle),
+  Pressed: (Background: PatchStyle(TexturePath: "../Common/Buttons/Disabled.png", Border: $C.@ButtonBorder), LabelStyle: $C.@SmallButtonDisabledLabelStyle)
+);
+
+@CardButtonStyle = ButtonStyle(
+  Default: (Background: #1c2836),
+  Hovered: (Background: #30465e),
+  Pressed: (Background: #3b536b)
+);
+@SelectedCardButtonStyle = ButtonStyle(
+  Default: (Background: PatchStyle(TexturePath: "../Common/Buttons/Disabled.png", Border: $C.@ButtonBorder)),
+  Hovered: (Background: PatchStyle(TexturePath: "../Common/Buttons/Disabled.png", Border: $C.@ButtonBorder)),
+  Pressed: (Background: PatchStyle(TexturePath: "../Common/Buttons/Disabled.png", Border: $C.@ButtonBorder))
+);
+
 $C.@PageOverlay {}
 
 $C.@Container {
@@ -17,8 +35,8 @@ $C.@Container {
         Group {
           Anchor: (Height: 36, Bottom: 8);
           LayoutMode: Left;
-          $C.@SmallSecondaryTextButton #BlocksTab { Anchor: (Width: 220, Height: 34, Right: 8); Text: "Blocks"; }
-          $C.@SmallSecondaryTextButton #ToolsTab { Anchor: (Width: 270, Height: 34); Text: "Tools"; }
+          $C.@SmallSecondaryTextButton #BlocksTab { FlexWeight: 1; Anchor: (Height: 34, Right: 4); Text: "Blocks"; }
+          $C.@SmallSecondaryTextButton #ToolsTab { FlexWeight: 1; Anchor: (Height: 34, Left: 4); Text: "Tools"; }
         }
         $C.@TextField #Search {
           Anchor: (Height: 38, Bottom: 8);
@@ -31,7 +49,7 @@ $C.@Container {
             FlexWeight: 1;
             Style: (FontSize: 14, RenderBold: true, TextColor: #d3dee3, VerticalAlignment: Center);
           }
-          $C.@SmallSecondaryTextButton #Filter { Anchor: (Width: 180, Height: 26); Text: "Selected only"; }
+          $C.@SmallSecondaryTextButton #Filter { Anchor: (Width: 180, Height: 26); Text: "All"; }
         }
         Group #CatalogScroll {
           FlexWeight: 1;
@@ -42,50 +60,75 @@ $C.@Container {
       }
       Group {
         FlexWeight: 1;
-        LayoutMode: Top;
-        Label #RangeSection {
-          Anchor: (Height: 30);
-          Text: "RANGE AND ACTIVATION";
-          Style: (FontSize: 16, RenderBold: true, TextColor: #d3dee3);
-        }
-        Label #RangeTitle { Text: "Maximum distance (blocks)"; Anchor: (Height: 26); Style: (FontSize: 14, TextColor: #d3dee3); }
-        Group {
-          LayoutMode: Left;
-          Anchor: (Height: 38);
-          $C.@SmallSecondaryTextButton #RadiusMinus { Anchor: (Width: 36, Height: 36, Right: 8); Text: "-"; }
-          $C.@NumberField #Radius {
-            FlexWeight: 1;
-            Anchor: (Height: 36, Right: 8);
-            Format: (MaxDecimalPlaces: 0, Step: 1, MinValue: 1, MaxValue: 32);
-            Value: 8;
+        LayoutMode: TopScrolling;
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+        Group #GeneralSettings {
+          Anchor: (Height: 350);
+          LayoutMode: Top;
+          Label #RangeSection {
+            Anchor: (Height: 30);
+            Text: "RANGE AND ACTIVATION";
+            Style: (FontSize: 16, RenderBold: true, TextColor: #d3dee3);
           }
-          $C.@SmallSecondaryTextButton #RadiusPlus { Anchor: (Width: 36, Height: 36); Text: "+"; }
-        }
-        Label #RangeHint {
-          Anchor: (Height: 48, Top: 8, Bottom: 12);
-          Text: "Enter 1 to 32. The radius starts at the first block. Up to 32 blocks per vein.";
-          Style: (FontSize: 13, Wrap: true, TextColor: #a8b6c6);
-        }
-        Label #ActivationTitle { Text: "Activation action"; Anchor: (Height: 26); Style: (FontSize: 14, TextColor: #d3dee3); }
-        Button #Activation {
-          Anchor: (Height: 38);
-          LayoutMode: Left;
-          Padding: (Horizontal: 12, Vertical: 8);
-          Background: #25364a;
-          Style: (Hovered: (Background: #30465e), Pressed: (Background: #3b536b));
-          Label #ActivationName { Style: (FontSize: 14, VerticalAlignment: Center, TextColor: #d3dee3); }
-          HotkeyLabel #ActivationKey {
-            InputBindingKey: "Crouch";
+          Label #RangeTitle { Text: "Maximum distance (blocks)"; Anchor: (Height: 26); Style: (FontSize: 14, TextColor: #d3dee3); }
+          Group {
+            LayoutMode: Left;
+            Anchor: (Height: 38);
+            $C.@SmallSecondaryTextButton #RadiusMinus { Anchor: (Width: 36, Height: 36, Right: 8); Text: "-"; }
+            $C.@NumberField #Radius {
+              FlexWeight: 1;
+              Anchor: (Height: 36, Right: 8);
+              Format: (MaxDecimalPlaces: 0, Step: 1, MinValue: 1, MaxValue: 32);
+              Value: 8;
+            }
+            $C.@SmallSecondaryTextButton #RadiusPlus { Anchor: (Width: 36, Height: 36); Text: "+"; }
           }
-          Label { Text: ")"; Style: (FontSize: 14, VerticalAlignment: Center, TextColor: #d3dee3); }
-          Group { FlexWeight: 1; }
-          Label { Text: ">"; Style: (FontSize: 14, VerticalAlignment: Center, TextColor: #d3dee3); }
+          Label #RangeHint {
+            Anchor: (Height: 48, Top: 8, Bottom: 12);
+            Text: "Enter 1 to 32. The radius starts at the first block. Up to 32 blocks per vein.";
+            Style: (FontSize: 13, Wrap: true, TextColor: #a8b6c6);
+          }
+          Label #ActivationTitle { Text: "Activation action"; Anchor: (Height: 26); Style: (FontSize: 14, TextColor: #d3dee3); }
+          Button #Activation {
+            Anchor: (Height: 38);
+            LayoutMode: Left;
+            Padding: (Horizontal: 12, Vertical: 8);
+            Background: #25364a;
+            Style: (Hovered: (Background: #30465e), Pressed: (Background: #3b536b));
+            Label #ActivationName { Style: (FontSize: 14, VerticalAlignment: Center, TextColor: #d3dee3); }
+            HotkeyLabel #ActivationKey {
+              InputBindingKey: "Crouch";
+            }
+            Label { Text: ")"; Style: (FontSize: 14, VerticalAlignment: Center, TextColor: #d3dee3); }
+            Group { FlexWeight: 1; }
+            Label { Text: ">"; Style: (FontSize: 14, VerticalAlignment: Center, TextColor: #d3dee3); }
+          }
+          Label #ActivationHint { Anchor: (Height: 56, Top: 8); Style: (FontSize: 14, Wrap: true, TextColor: #d3dee3); }
+          Label #ControlsHint {
+            Anchor: (Height: 68, Bottom: 12);
+            Text: "The key follows your controls. Set crouch to hold. Walking and sprinting require movement.";
+            Style: (FontSize: 12, Wrap: true, TextColor: #a8b6c6);
+          }
         }
-        Label #ActivationHint { Anchor: (Height: 56, Top: 8); Style: (FontSize: 14, Wrap: true, TextColor: #d3dee3); }
-        Label #ControlsHint {
-          Anchor: (Height: 68, Bottom: 12);
-          Text: "The key follows your controls. Set crouch to hold. Walking and sprinting require movement.";
-          Style: (FontSize: 12, Wrap: true, TextColor: #a8b6c6);
+        Group #ToolSettings {
+          Visible: false;
+          Anchor: (Height: 480);
+          LayoutMode: Top;
+          Label #ToolHeading { Anchor: (Height: 30); Style: (FontSize: 16, RenderBold: true, TextColor: #d3dee3); }
+          ItemIcon #ToolPreview { Anchor: (Width: 80, Height: 80, Bottom: 8); }
+          Label #ToolName { Anchor: (Height: 44); Style: (FontSize: 14, Wrap: true, TextColor: #d3dee3); }
+          Group {
+            Anchor: (Height: 34, Bottom: 16);
+            LayoutMode: Left;
+            $C.@CheckBox #ToolEnabled { Anchor: (Width: 22, Height: 22, Right: 10); }
+            Label #ToolEnabledLabel { FlexWeight: 1; Anchor: (Height: 26); Style: (FontSize: 14, TextColor: #d3dee3); }
+          }
+          Label #ToolTypeLabel { Anchor: (Height: 30); Style: (FontSize: 14, TextColor: #d3dee3); }
+          $C.@SmallSecondaryTextButton #ModeOres { Anchor: (Height: 36, Bottom: 8); Text: "Ores"; }
+          $C.@SmallSecondaryTextButton #ModeLogs { Anchor: (Height: 36, Bottom: 8); Text: "Logs"; }
+          $C.@SmallSecondaryTextButton #ModeAll { Anchor: (Height: 36, Bottom: 8); Text: "Everything"; }
+          Label #ToolHint { Anchor: (Height: 60, Bottom: 8); Style: (FontSize: 12, Wrap: true, TextColor: #a8b6c6); }
+          $C.@SmallSecondaryTextButton #General { Anchor: (Height: 34); Text: "General settings"; }
         }
         Label #Summary { Anchor: (Height: 38); Style: (FontSize: 13, Wrap: true, TextColor: #d3dee3); }
         Group {

@@ -3,7 +3,7 @@ import java.util.Properties
 plugins { java }
 
 group = "br.pedro.hytale"
-version = "0.5.0"
+version = "0.6.0"
 
 java { toolchain { languageVersion.set(JavaLanguageVersion.of(25)) } }
 
@@ -16,7 +16,10 @@ val hytaleHome = providers.gradleProperty("hytaleHome")
     .orElse(local.getProperty("hytale.home", "D:/Games/Hytale"))
 val serverJar = file("${hytaleHome.get()}/install/release/package/game/latest/Server/HytaleServer.jar")
 
-dependencies { compileOnly(files(serverJar)) }
+dependencies {
+    compileOnly(files(serverJar))
+    testCompileOnly(files(serverJar))
+}
 
 tasks.compileJava {
     doFirst {
@@ -50,3 +53,10 @@ tasks.test {
     failOnNoDiscoveredTests.set(false)
     dependsOn(verifyVeinTraversal, verifySettings)
 }
+
+val verifyAssetRules by tasks.registering(JavaExec::class) {
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath + files(serverJar)
+    mainClass.set("br.pedro.hytale.veinminer.AssetRulesTest")
+}
+tasks.check { dependsOn(verifyAssetRules) }

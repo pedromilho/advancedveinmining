@@ -1,8 +1,9 @@
 package br.pedro.hytale.veinminer;
 
 import java.util.Set;
+import java.util.Map;
 
-record PlayerSettings(Set<String> blocks, Set<String> tools, int radius, Activation activation) {
+record PlayerSettings(Set<String> blocks, Set<String> tools, int radius, Activation activation, Map<String, ToolBlockMode> toolModes) {
     static final int DEFAULT_RADIUS = 8;
     static final int MAX_RADIUS = 32;
     static final Set<String> DEFAULT_TOOLS = Set.of(
@@ -25,8 +26,24 @@ record PlayerSettings(Set<String> blocks, Set<String> tools, int radius, Activat
     PlayerSettings {
         blocks = Set.copyOf(blocks);
         tools = Set.copyOf(tools);
+        toolModes = Map.copyOf(toolModes);
         if (radius < 1 || radius > MAX_RADIUS) throw new IllegalArgumentException("Distance must be between 1 and 32.");
         if (activation == null) throw new IllegalArgumentException("Choose an activation action.");
+    }
+
+    PlayerSettings(Set<String> blocks, Set<String> tools, int radius, Activation activation) {
+        this(blocks, tools, radius, activation, Map.of());
+    }
+
+    ToolBlockMode modeFor(String toolId, ToolBlockMode inferred) {
+        return toolModes.getOrDefault(toolId, inferred);
+    }
+
+    enum ToolBlockMode {
+        ORES, LOGS, ALL;
+        boolean allows(boolean ore, boolean log) {
+            return this == ALL || (this == ORES && ore) || (this == LOGS && log);
+        }
     }
 
     static PlayerSettings defaults() {
