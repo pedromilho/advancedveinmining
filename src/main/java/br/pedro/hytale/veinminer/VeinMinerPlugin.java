@@ -23,10 +23,16 @@ public final class VeinMinerPlugin extends JavaPlugin {
         // Mantém o local original para preservar as preferências após renomear o plugin.
         var settings = new SettingsRepository(getDataDirectory().resolveSibling("Pedro_VeinMiner").resolve("players"),
             message -> getLogger().atWarning().log(message), AssetRules::defaults, AssetRules::hatchetDefaults, AssetRules::pickaxeDefaults);
+        com.hypixel.hytale.server.core.permissions.PermissionsModule.registerPermission(ConfigurationAccess.PERMISSION);
+        com.hypixel.hytale.server.core.permissions.PermissionsModule.registerPermission(ConfigurationAccess.READ_PERMISSION);
+        com.hypixel.hytale.server.core.permissions.PermissionsModule.registerPermission(ConfigurationAccess.MANAGE_PERMISSION);
+        ConfigurationAccess.configureCommands(new CommandAccessSettings(
+            getDataDirectory().resolveSibling("Pedro_VeinMiner").resolve("commands.properties"),
+            message -> getLogger().atWarning().log(message)));
         mining = new VeinMiningSystem(settings);
         getEntityStoreRegistry().registerSystem(mining);
         getCommandRegistry().registerCommand(new SettingsCommand(settings));
-        getLogger().atInfo().log("Advenced Vein Mining 0.6.0 loaded. Use /veinminer to configure.");
+        getLogger().atInfo().log("Advenced Vein Mining 0.7.0 loaded. Use /veinminer to configure.");
     }
 
     @Override
@@ -42,11 +48,23 @@ public final class VeinMinerPlugin extends JavaPlugin {
             addAliases("advancedveinminer", "advancedveinmining", "veinmining");
             this.settings = settings;
             requireNoPermission();
+            addUsageVariant(new PermissionCommand());
+        }
+
+        @Override
+        public boolean hasPermission(com.hypixel.hytale.server.core.command.system.CommandSender sender) {
+            return ConfigurationAccess.canView(sender) || ConfigurationAccess.canUsePermissionCommands(sender);
         }
 
         @Override
         protected void execute(CommandContext context, Store<EntityStore> store, Ref<EntityStore> ref,
                                PlayerRef playerRef, World world) {
+            // Permission can change after the command is accepted, before world-thread execution.
+            if (!ConfigurationAccess.canView(playerRef)) {
+                playerRef.sendMessage(com.hypixel.hytale.server.core.Message.raw(
+                    UiLanguage.from(playerRef.getLanguage()).text("permission.denied")));
+                return;
+            }
             Player player = store.getComponent(ref, Player.getComponentType());
             if (player != null) player.getPageManager().openCustomPage(ref, store,
                 new VeinMinerSettingsPage(playerRef, settings));

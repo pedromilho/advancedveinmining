@@ -3,7 +3,7 @@ import java.util.Properties
 plugins { java }
 
 group = "br.pedro.hytale"
-version = "0.6.0"
+version = "0.7.0"
 
 java { toolchain { languageVersion.set(JavaLanguageVersion.of(25)) } }
 
@@ -60,3 +60,10 @@ val verifyAssetRules by tasks.registering(JavaExec::class) {
     mainClass.set("br.pedro.hytale.veinminer.AssetRulesTest")
 }
 tasks.check { dependsOn(verifyAssetRules) }
+
+val verifyPermissions by tasks.registering(JavaExec::class) {
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath + files(serverJar)
+    mainClass.set("br.pedro.hytale.veinminer.PermissionsTest")
+}
+tasks.check { dependsOn(verifyPermissions) }

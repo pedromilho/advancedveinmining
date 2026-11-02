@@ -1,1 +1,7 @@
 advancedVeinMining.commands.settings.description = Open your Advenced Vein Mining settings.
+
+
+server.advancedVeinMining.commands.permissions.description=Set a player configuration access level.
+server.advancedVeinMining.commands.permissions.player=Online player nickname
+server.advancedVeinMining.commands.permissions.mode=modify
+server.advancedVeinMining.commands.permissions.state=on, off or readonly

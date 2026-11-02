@@ -17,6 +17,8 @@ import com.hypixel.hytale.server.core.ui.Value;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.Universe;
+import java.util.UUID;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.io.IOException;
 import java.util.Comparator;
@@ -59,6 +61,10 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
 
     private SelectionFilter selectionFilter = SelectionFilter.ALL;
     private boolean toolMenu;
+    private boolean playersMenu;
+    private PlayerListEntry.Filter playerFilter = PlayerListEntry.Filter.ALL;
+    private final CatalogWindow<PlayerListEntry> playersWindow = new CatalogWindow<>();
+    private final Map<UUID, String> visiblePlayers = new HashMap<>();
     private ScheduledFuture<?> pendingSearch;
     private long searchRevision;
     private boolean dismissed;
@@ -106,13 +112,14 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
 
     @Override
     public void build(Ref<EntityStore> ref, UICommandBuilder commands, UIEventBuilder events, Store<EntityStore> store) {
+        if (!requireConfigurationAccess()) return;
         commands.append("Pages/VeinMinerSettings.ui");
         events.addEventBinding(CustomUIEventBindingType.ValueChanged, "#Search",
             EventData.of("Action", "Search").append("@Search", "#Search.Value"), false);
         events.addEventBinding(CustomUIEventBindingType.ValueChanged, "#Radius",
             EventData.of("Action", "Radius").append("@Radius", "#Radius.Value"), false);
         for (String action : List.of("BlocksTab", "ToolsTab", "Filter", "RadiusMinus", "RadiusPlus",
-                "Activation", "Defaults", "Clear", "Cancel", "General")) bind(events, "#" + action, action);
+                "Activation", "Defaults", "Clear", "Cancel", "Players", "CommandAdminOnly", "CommandAll")) bind(events, "#" + action, action);
         // Lê também o valor atual ao salvar, mesmo sem sair do campo numérico.
         events.addEventBinding(CustomUIEventBindingType.Activating, "#Save",
             EventData.of("Action", "Save").append("@Radius", "#Radius.Value"));
@@ -125,6 +132,7 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
 
     private void renderGrid(UICommandBuilder commands, UIEventBuilder events) {
         cancelPendingSearch();
+        if (playersMenu) { renderPlayers(commands, events); return; }
         String[] words = CatalogSearch.words(search);
         List<Entry> filtered = catalog().stream()
             .filter(e -> selectionFilter.matches(selection().contains(e.id())))
@@ -167,9 +175,88 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
         }
     }
 
+    private void renderPlayers(UICommandBuilder commands, UIEventBuilder events) {
+        String[] words = CatalogSearch.words(search);
+        var players = Universe.get().getPlayers().stream().map(PlayerListEntry::from)
+            .filter(playerFilter::matches)
+            .filter(p -> CatalogSearch.matches(CatalogSearch.normalize(p.name()), words))
+            .sorted(PlayerListEntry.ORDER).toList();
+        commands.clear("#Grid");
+        visibleCards.clear();
+        visiblePlayers.clear();
+        playersWindow.reset(players);
+        appendPlayers(commands, events);
+        if (players.isEmpty()) {
+            commands.appendInline("#Grid", "Label #Empty { Anchor: (Height: 40); Style: (FontSize: 14, TextColor: #a8b6c6); }");
+            commands.set("#Empty.Text", language.text("empty"));
+        }
+    }
+
+    private void appendPlayers(UICommandBuilder commands, UIEventBuilder events) {
+        var batch = playersWindow.nextBatch();
+        int start = playersWindow.loaded() - batch.size();
+        for (int offset = 0; offset < batch.size(); offset++) {
+            int index = start + offset;
+            PlayerListEntry player = batch.get(offset);
+            String row = "#Grid[" + index + "]";
+            visiblePlayers.put(player.uuid(), row);
+            commands.append("#Grid", "Pages/VeinMinerPlayerRow.ui");
+            commands.set(row + " #PlayerName.Text", player.displayName());
+            commands.set(row + " #Modify.Visible", !player.owner());
+            commands.set(row + " #Readonly.Visible", !player.owner());
+            commands.set(row + " #ModifyLocked.Visible", player.owner());
+            commands.set(row + " #ReadonlyLocked.Visible", player.owner());
+            if (!player.owner()) {
+                events.addEventBinding(CustomUIEventBindingType.ValueChanged, row + " #Modify",
+                    EventData.of("Action", "PlayerModify:" + player.uuid()).append("@Selected", row + " #Modify.Value"));
+                events.addEventBinding(CustomUIEventBindingType.ValueChanged, row + " #Readonly",
+                    EventData.of("Action", "PlayerReadonly:" + player.uuid()).append("@Selected", row + " #Readonly.Value"));
+            }
+            if (playersWindow.hasMore() && index >= playersWindow.loaded() - 5) {
+                events.addEventBinding(CustomUIEventBindingType.MouseEntered, row + " #LoadAhead",
+                    EventData.of("Action", "PlayerLoadAhead:" + playersWindow.cursor()), false);
+            }
+        }
+        syncPlayerChecks(commands);
+    }
+
+    private void syncPlayerChecks(UICommandBuilder commands) {
+        visiblePlayers.forEach((uuid, row) -> {
+            PlayerRef player = Universe.get().getPlayer(uuid);
+            var level = player == null ? ConfigurationAccess.Level.OFF : ConfigurationAccess.level(player);
+            commands.set(row + " #Modify.Value", level == ConfigurationAccess.Level.MODIFY);
+            commands.set(row + " #Readonly.Value", level == ConfigurationAccess.Level.READONLY);
+        });
+    }
+
     private void renderControls(UICommandBuilder commands, UIEventBuilder events) {
-        commands.set("#GeneralSettings.Visible", editingTool == null);
-        commands.set("#ToolSettings.Visible", editingTool != null);
+        boolean canModify = ConfigurationAccess.canModify(playerRef);
+        commands.set("#GeneralSettings.Visible", !playersMenu && editingTool == null);
+        commands.set("#ToolSettings.Visible", !playersMenu && editingTool != null);
+        commands.set("#Players.Visible", playersMenu || editingTool == null);
+        commands.set("#PermissionsHelp.Visible", playersMenu);
+        commands.set("#PlayerColumns.Visible", playersMenu);
+        commands.set("#CatalogTabs.Visible", !playersMenu);
+        commands.set("#ListActions.Visible", !playersMenu);
+        commands.set("#PermissionsHeading.Text", language.text("players.heading"));
+        commands.set("#CommandAccessTitle.Text", language.text("commands.title"));
+        commands.set("#CommandAccessHint.Text", language.text("commands.hint"));
+        commands.set("#CommandAdminOnly.Text", language.text("commands.adminOnly"));
+        commands.set("#CommandAll.Text", language.text("commands.all"));
+        selectedButton(commands, "#CommandAdminOnly", ConfigurationAccess.commandMode() == CommandAccessSettings.Mode.ADMIN_ONLY);
+        selectedButton(commands, "#CommandAll", ConfigurationAccess.commandMode() == CommandAccessSettings.Mode.ALL);
+        commands.set("#CommandAdminOnly.Disabled", !canModify || !ConfigurationAccess.canManage(playerRef));
+        commands.set("#CommandAll.Disabled", !canModify || !ConfigurationAccess.canManage(playerRef));
+        commands.set("#PermissionsHint.Text", language.text(ConfigurationAccess.canManage(playerRef) && canModify ? "players.hint" : "players.hint.readonly"));
+        commands.set("#PlayerNameColumn.Text", language.text("players.name"));
+        commands.set("#ModifyColumn.Text", language.text("players.modify"));
+        commands.set("#ReadonlyColumn.Text", language.text("players.readonly"));
+        commands.set("#Players.Text", language.text(playersMenu ? "players.back" : "players.button"));
+        commands.set("#ReadOnlyNotice.Visible", !canModify);
+        commands.set("#ReadOnlyNotice.Text", language.text("permission.readonly"));
+        for (String button : List.of("RadiusMinus", "RadiusPlus", "Activation", "Defaults", "Clear", "ModeOres", "ModeLogs", "ModeAll", "Save", "Players"))
+            commands.set("#" + button + ".Disabled", !canModify);
+        if (playersMenu) syncPlayerChecks(commands);
         if (editingTool != null) {
             for (String action : List.of("ModeOres", "ModeLogs", "ModeAll")) {
                 events.addEventBinding(CustomUIEventBindingType.Activating, "#" + action,
@@ -187,7 +274,6 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
             commands.set("#ToolEnabledLabel.Text", language.text("tool.enabled"));
             commands.set("#ToolTypeLabel.Text", language.text("tool.type"));
             commands.set("#ToolHint.Text", language.text("tool.hint"));
-            commands.set("#General.Text", language.text("tool.general"));
             commands.set("#ModeOres.Text", language.text("tool.ores"));
             selectedButton(commands, "#ModeOres", mode == PlayerSettings.ToolBlockMode.ORES);
             commands.set("#ModeLogs.Text", language.text("tool.logs"));
@@ -196,7 +282,7 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
             selectedButton(commands, "#ModeAll", mode == PlayerSettings.ToolBlockMode.ALL);
         }
         commands.set("#PageHeading.Text", language.text("title"));
-        commands.set("#Search.PlaceholderText", language.text("search"));
+        commands.set("#Search.PlaceholderText", language.text(playersMenu ? "players.search" : "search"));
         commands.set("#RangeSection.Text", language.text("range.section"));
         commands.set("#RangeTitle.Text", language.text("range.title"));
         commands.set("#RangeHint.Text", language.text("range.hint"));
@@ -208,11 +294,11 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
         commands.set("#Save.Text", language.text("save"));
         selectedButton(commands, "#BlocksTab", !toolMenu);
         selectedButton(commands, "#ToolsTab", toolMenu);
-        commands.set("#Filter.Text", language.text("filter.mode." + selectionFilter.name()));
+        commands.set("#Filter.Text", language.text("filter.mode." + (playersMenu ? playerFilter.name() : selectionFilter.name())));
         commands.set("#BlocksTab.Text", language.text("tab.blocks") + " (" + blocks.size() + ")");
         commands.set("#ToolsTab.Text", language.text("tab.tools") + " (" + tools.size() + ")");
-        commands.set("#CatalogTitle.Text", language.text(toolMenu ? "catalog.tools" : "catalog.blocks")
-            + " (" + window.total() + ")");
+        commands.set("#CatalogTitle.Text", language.text(playersMenu ? "players.heading" : toolMenu ? "catalog.tools" : "catalog.blocks")
+            + " (" + (playersMenu ? playersWindow.total() : window.total()) + ")");
         commands.set("#ActivationName.Text", language.text("activation." + activation.name()) + " (");
         // HotkeyLabel resolve o atalho no cliente, acompanhando remapeamentos e controle.
         commands.set("#ActivationKey.InputBindingKey", activation.inputBinding);
@@ -238,8 +324,33 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
 
     @Override
     public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, Data data) {
-        if (dismissed) return;
+        if (dismissed || !requireConfigurationAccess()) return;
+        if (playersMenu && !ConfigurationAccess.canModify(playerRef)) {
+            playersMenu = false;
+            search = "";
+            selectionFilter = SelectionFilter.ALL;
+            playerFilter = PlayerListEntry.Filter.ALL;
+            var resetCommands = new UICommandBuilder();
+            var resetEvents = new UIEventBuilder();
+            resetCommands.set("#Search.Value", "");
+            statusKey = "permission.readonly";
+            renderGrid(resetCommands, resetEvents);
+            renderControls(resetCommands, resetEvents);
+            sendUpdate(resetCommands, resetEvents, false);
+            return;
+        }
         if (data.action == null) { sendUpdate(); return; }
+        if (!ConfigurationAccess.canPerform(playerRef, data.action)) {
+            var deniedCommands = new UICommandBuilder();
+            var deniedEvents = new UIEventBuilder();
+            deniedCommands.set("#Radius.Value", radius);
+            visibleCards.forEach((key, card) -> deniedCommands.set(card + " #Selected.Value",
+                key.startsWith("Tool:") ? tools.contains(key.substring(5)) : blocks.contains(key.substring(6))));
+            statusKey = ConfigurationAccess.canModify(playerRef) ? "permission.manageDenied" : "permission.readonly";
+            renderControls(deniedCommands, deniedEvents);
+            sendUpdate(deniedCommands, deniedEvents, false);
+            return;
+        }
         if (data.action.equals("Cancel")) { dismissed = true; cancelPendingSearch(); close(); return; }
         if (data.action.equals("Search")) {
             String query = data.search == null ? "" : data.search;
@@ -249,7 +360,7 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
             cancelPendingSearch();
             long revision = searchRevision;
             pendingSearch = store.getExternalData().getWorld().scheduleAfter(() -> {
-                if (dismissed || searchRevision != revision || !ref.isValid()) return;
+                if (dismissed || searchRevision != revision || !ref.isValid() || !requireConfigurationAccess()) return;
                 var searchCommands = new UICommandBuilder();
                 var searchEvents = new UIEventBuilder();
                 renderGrid(searchCommands, searchEvents);
@@ -267,8 +378,25 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
                 toolMenu = data.action.equals("ToolsTab");
                 editingTool = null;
                 search = ""; selectionFilter = SelectionFilter.ALL;
+                playerFilter = PlayerListEntry.Filter.ALL;
                 commands.set("#Search.Value", "");
                 refreshGrid = true;
+            }
+            case "Players" -> {
+                playersMenu = !playersMenu;
+                search = ""; selectionFilter = SelectionFilter.ALL;
+                playerFilter = PlayerListEntry.Filter.ALL;
+                commands.set("#Search.Value", "");
+                statusKey = "status.pending";
+                refreshGrid = true;
+            }
+            case "CommandAdminOnly", "CommandAll" -> {
+                if (!playersMenu) break;
+                try {
+                    ConfigurationAccess.saveCommandMode(data.action.equals("CommandAll")
+                        ? CommandAccessSettings.Mode.ALL : CommandAccessSettings.Mode.ADMIN_ONLY);
+                    statusKey = "status.pending";
+                } catch (IOException error) { statusKey = "status.saveError"; }
             }
             case "General" -> editingTool = null;
             case "ModeOres", "ModeLogs", "ModeAll" -> {
@@ -293,7 +421,11 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
                     statusKey = "status.selection";
                 }
             }
-            case "Filter" -> { selectionFilter = selectionFilter.next(); refreshGrid = true; }
+            case "Filter" -> {
+                if (playersMenu) playerFilter = playerFilter.next();
+                else selectionFilter = selectionFilter.next();
+                refreshGrid = true;
+            }
             case "Radius" -> {
                 if (validRadius(data.radius)) { radius = data.radius; statusKey = "status.range"; }
                 else statusKey = "status.invalidRange";
@@ -327,11 +459,31 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
                     settings.save(playerRef.getUuid(), new PlayerSettings(blocks, tools, radius, activation, toolModes));
                     playerRef.sendMessage(Message.raw(language.text("saved", blocks.size(), tools.size(), radius,
                         language.text("activation." + activation.name()))));
-                    dismissed = true; cancelPendingSearch(); close(); return;
+                    statusKey = "status.saved";
                 } catch (IOException error) { statusKey = "status.saveError"; }
             }
             default -> {
+                if (data.action.startsWith("PlayerLoadAhead:")) {
+                    if (playersMenu && playersWindow.acceptsCursor(data.action.substring("PlayerLoadAhead:".length()))) appendPlayers(commands, events);
+                    break;
+                }
+                if (data.action.startsWith("PlayerModify:") || data.action.startsWith("PlayerReadonly:")) {
+                    if (!playersMenu) break;
+                    String value = data.action.substring(data.action.indexOf(':') + 1);
+                    UUID target;
+                    try { target = UUID.fromString(value); } catch (IllegalArgumentException ignored) { break; }
+                    PlayerRef player = Universe.get().getPlayer(target);
+                    if (player == null || !visiblePlayers.containsKey(target)) break;
+                    var requested = data.action.startsWith("PlayerModify:") ? ConfigurationAccess.Level.MODIFY : ConfigurationAccess.Level.READONLY;
+                    boolean changed = ConfigurationAccess.setLevel(target,
+                        ConfigurationAccess.change(ConfigurationAccess.level(player), requested, Boolean.TRUE.equals(data.selected)));
+                    statusKey = changed ? "status.pending" : "permission.ownerProtected";
+                    if (!requireConfigurationAccess()) return;
+                    if (playerFilter != PlayerListEntry.Filter.ALL) refreshGrid = true;
+                    break;
+                }
                 if (data.action.startsWith("LoadAhead:")) {
+                    if (playersMenu) break;
                     if (!window.acceptsCursor(data.action.substring("LoadAhead:".length()))) { sendUpdate(); return; }
                     if (pendingSearch != null) refreshGrid = true;
                     else appendBatch(commands, events);
@@ -365,6 +517,15 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
         if (refreshGrid) renderGrid(commands, events);
         renderControls(commands, events);
         sendUpdate(commands, events, false);
+    }
+
+    private boolean requireConfigurationAccess() {
+        if (ConfigurationAccess.canView(playerRef)) return true;
+        dismissed = true;
+        cancelPendingSearch();
+        playerRef.sendMessage(Message.raw(language.text("permission.denied")));
+        close();
+        return false;
     }
 
     private static boolean validRadius(Integer value) { return value != null && value >= 1 && value <= PlayerSettings.MAX_RADIUS; }

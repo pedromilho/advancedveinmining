@@ -28,6 +28,19 @@ public final class SettingsTest {
         check(UiLanguage.from("fr-FR").assetLocale.equals("en-US"), "Nomes do catalogo usam ingles para outros idiomas");
         check(UiLanguage.from("pt-PT").assetLocale.equals("pt-BR"), "Nomes portugueses usam assets portugueses disponiveis");
 
+        // The native CustomUI label enum uses Start/Center/End, never Left/Right.
+        for (String document : new String[] {"VeinMinerSettings.ui", "VeinMinerItemCard.ui", "VeinMinerPlayerRow.ui"}) {
+            try (var stream = SettingsTest.class.getResourceAsStream("/Common/UI/Custom/Pages/" + document)) {
+                check(stream != null, "UI document packaged: " + document);
+                String ui = new String(stream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                var alignments = java.util.regex.Pattern.compile("HorizontalAlignment: *([A-Za-z]+)").matcher(ui);
+                while (alignments.find()) {
+                    check(Set.of("Start", "Center", "End").contains(alignments.group(1)),
+                        "Valid native label alignment in " + document + ": " + alignments.group(1));
+                }
+            }
+        }
+
         PlayerSettings defaults = PlayerSettings.defaults();
         check(defaults.activation() == PlayerSettings.Activation.CROUCH, "Agachar por padrao");
         check(defaults.radius() == 8 && !defaults.blocks().isEmpty(), "Padrao preserva minerios");
@@ -53,6 +66,23 @@ public final class SettingsTest {
 
         Files.createDirectories(Path.of("build", "settings-tests"));
         Path root = Files.createTempDirectory(Path.of("build", "settings-tests"), "run-");
+        var policyWarnings = new ArrayList<String>();
+        Path policyFile = root.resolve("commands.properties");
+        var commandPolicy = new CommandAccessSettings(policyFile, policyWarnings::add);
+        check(commandPolicy.mode() == CommandAccessSettings.Mode.ADMIN_ONLY, "Command access defaults to Admin only");
+        commandPolicy.save(CommandAccessSettings.Mode.ALL);
+        check(new CommandAccessSettings(policyFile, policyWarnings::add).mode() == CommandAccessSettings.Mode.ALL, "All policy survives restart");
+        commandPolicy.save(CommandAccessSettings.Mode.ADMIN_ONLY);
+        check(new CommandAccessSettings(policyFile, policyWarnings::add).mode() == CommandAccessSettings.Mode.ADMIN_ONLY, "Admin only can be restored and persisted");
+        Files.writeString(policyFile, "PermissionCommands=INVALID\n");
+        check(new CommandAccessSettings(policyFile, policyWarnings::add).mode() == CommandAccessSettings.Mode.ADMIN_ONLY && policyWarnings.size() == 1, "Invalid policy fails closed to Admin only");
+        Path blockedPolicyParent = root.resolve("blocked-policy");
+        Files.writeString(blockedPolicyParent, "not a directory");
+        var failedPolicy = new CommandAccessSettings(blockedPolicyParent.resolve("commands.properties"), policyWarnings::add);
+        try { failedPolicy.save(CommandAccessSettings.Mode.ALL); throw new AssertionError("Policy save should fail"); }
+        catch (java.io.IOException expected) { }
+        check(failedPolicy.mode() == CommandAccessSettings.Mode.ADMIN_ONLY, "Failed policy save never enables public commands");
+
         var warnings = new ArrayList<String>();
         var repository = new SettingsRepository(root, warnings::add);
         UUID first = UUID.randomUUID();
