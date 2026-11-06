@@ -32,7 +32,7 @@ public final class VeinMinerPlugin extends JavaPlugin {
         mining = new VeinMiningSystem(settings);
         getEntityStoreRegistry().registerSystem(mining);
         getCommandRegistry().registerCommand(new SettingsCommand(settings));
-        getLogger().atInfo().log("Advenced Vein Mining 0.7.0 loaded. Use /veinminer to configure.");
+        getLogger().atInfo().log("Advenced Vein Mining 0.7.1 loaded. Use /veinminer to configure.");
     }
 
     @Override

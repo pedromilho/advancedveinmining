@@ -5,7 +5,7 @@
   "Description": "Vein mining with configurable blocks, tools, range and activation for each player.",
   "Authors": [{ "Name": "Pedro" }],
   "Main": "br.pedro.hytale.veinminer.VeinMinerPlugin",
-  "ServerVersion": "=0.7.5",
+  "ServerVersion": "=0.7.6",
   "Dependencies": {},
   "OptionalDependencies": {},
   "DisabledByDefault": false,
