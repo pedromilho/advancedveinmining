@@ -30,3 +30,5 @@ Permission nodes: `advancedveinmining.config` (edit), `advancedveinmining.readon
 The owner always retains full access and their permission checks are locked.
 
 Permission commands default to **Admin only**. In the player permissions page, administrators can choose **All** to allow everyone to use those commands. This policy is saved across restarts and never allows changing the owner.
+
+[All Rights Reserved](LICENSE).
