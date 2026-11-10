@@ -1,1 +1,1 @@
-Updated to Hytale 0.7.6.
+Updated to Hytale 0.7.7
