@@ -23,7 +23,8 @@ public final class VeinMinerPlugin extends JavaPlugin {
     protected void setup() {
         // Mantém o local original para preservar as preferências após renomear o plugin.
         var settings = new SettingsRepository(getDataDirectory().resolveSibling("Pedro_VeinMiner").resolve("players"),
-            message -> getLogger().atWarning().log(message), AssetRules::defaults, AssetRules::hatchetDefaults, AssetRules::pickaxeDefaults);
+            message -> getLogger().atWarning().log(message), AssetRules::defaults, AssetRules::hatchetDefaults,
+            AssetRules::pickaxeDefaults, AssetRules::shovelDefaults);
         com.hypixel.hytale.server.core.permissions.PermissionsModule.registerPermission(ConfigurationAccess.PERMISSION);
         com.hypixel.hytale.server.core.permissions.PermissionsModule.registerPermission(ConfigurationAccess.READ_PERMISSION);
         com.hypixel.hytale.server.core.permissions.PermissionsModule.registerPermission(ConfigurationAccess.MANAGE_PERMISSION);
@@ -35,7 +36,7 @@ public final class VeinMinerPlugin extends JavaPlugin {
         visuals = new MiningVisuals(settings);
         getEntityStoreRegistry().registerSystem(visuals);
         getCommandRegistry().registerCommand(new SettingsCommand(settings));
-        getLogger().atInfo().log("Advenced Vein Mining 0.7.3 loaded. Use /veinminer to configure.");
+        getLogger().atInfo().log("Advenced Vein Mining %s loaded. Use /veinminer to configure.", getManifest().getVersion());
     }
 
     @Override

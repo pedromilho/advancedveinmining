@@ -4,9 +4,15 @@ import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import java.util.HashSet;
 import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /** Uses registered assets, including inherited metadata from other mods. */
 final class AssetRules {
+    private static final String SOILS_GATHER_TYPE = "soils";
+    private static final String WOODS_GATHER_TYPE = "woods";
+
     private AssetRules() {}
 
     static boolean ore(BlockType block) {
@@ -20,7 +26,7 @@ final class AssetRules {
         String gather = gatherType(block);
         if ("rocks".equals(gather) || "volcanicrocks".equals(gather)) return true;
         // Gravel can share the Rocks catalog category while remaining a soil for mining.
-        if ("soils".equals(gather)) return false;
+        if (SOILS_GATHER_TYPE.equals(gather)) return false;
         Item item = block.getItem();
         return tag(item, "Rock") || tag(item, "Stone") || tag(block.getData(), "Rock")
             || tag(block.getData(), "Stone") || category(item, "Blocks.Rocks");
@@ -51,13 +57,16 @@ final class AssetRules {
             return PlayerSettings.ToolBlockMode.LOGS;
         if (token(identity, "pickaxe") || tag(item, "Pickaxe") || category(item, "Items.Tools.Pickaxes"))
             return PlayerSettings.ToolBlockMode.ORES;
+        if (token(identity, "shovel") || token(identity, "spade") || tag(item, "Shovel") || tag(item, "Spade")
+            || category(item, "Items.Tools.Shovels"))
+            return PlayerSettings.ToolBlockMode.DIRT_SAND;
         // Custom tools with different IDs can still be recognized by their effective gather power.
         if (item.getTool() != null && item.getTool().getSpecs() != null) {
             float woods = 0, rocks = 0;
             for (var spec : item.getTool().getSpecs()) {
                 if (spec.isIncorrect()) continue;
                 String gather = lower(spec.getGatherType());
-                if (gather.equals("woods")) woods = Math.max(woods, spec.getPower());
+                if (WOODS_GATHER_TYPE.equals(gather)) woods = Math.max(woods, spec.getPower());
                 if (gather.equals("rocks") || gather.startsWith("ore")) rocks = Math.max(rocks, spec.getPower());
             }
             if (woods > rocks) return PlayerSettings.ToolBlockMode.LOGS;
@@ -69,9 +78,12 @@ final class AssetRules {
     static boolean allows(PlayerSettings settings, Item item, BlockType block) {
         if (item == null || !settings.blocks().contains(block.getId())) return false;
         var mode = settings.modeFor(item.getId(), defaultMode(item));
-        if (mode == PlayerSettings.ToolBlockMode.ALL) return true;
-        boolean isLog = log(block);
-        return mode.allows(!isLog && (ore(block) || stone(block)), isLog);
+        return switch (mode) {
+            case ORES -> ore(block) || (stone(block) && !log(block));
+            case LOGS -> WOODS_GATHER_TYPE.equals(gatherType(block)) || log(block);
+            case DIRT_SAND -> SOILS_GATHER_TYPE.equals(gatherType(block));
+            case ALL -> true;
+        };
     }
 
     static PlayerSettings pickaxeDefaults() {
@@ -79,8 +91,7 @@ final class AssetRules {
         var tools = new HashSet<String>();
         BlockType.getAssetMap().getAssetMap().values().stream()
             .filter(b -> !b.getId().startsWith("*") && ore(b)).forEach(b -> blocks.add(b.getId()));
-        Item.getAssetMap().getAssetMap().values().stream()
-            .filter(i -> i.getTool() != null && !i.isState() && !i.getId().startsWith("*"))
+        configurableTools()
             .filter(i -> defaultMode(i) == PlayerSettings.ToolBlockMode.ORES).forEach(i -> tools.add(i.getId()));
         return new PlayerSettings(blocks, tools, PlayerSettings.DEFAULT_RADIUS, PlayerSettings.Activation.CROUCH);
     }
@@ -90,8 +101,7 @@ final class AssetRules {
         var tools = new HashSet<String>();
         BlockType.getAssetMap().getAssetMap().values().stream()
             .filter(b -> !b.getId().startsWith("*") && log(b)).forEach(b -> blocks.add(b.getId()));
-        Item.getAssetMap().getAssetMap().values().stream()
-            .filter(i -> i.getTool() != null && !i.isState() && !i.getId().startsWith("*"))
+        configurableTools()
             .filter(i -> defaultMode(i) == PlayerSettings.ToolBlockMode.LOGS).forEach(i -> tools.add(i.getId()));
         return new PlayerSettings(blocks, tools, PlayerSettings.DEFAULT_RADIUS, PlayerSettings.Activation.CROUCH);
     }
@@ -102,10 +112,19 @@ final class AssetRules {
         BlockType.getAssetMap().getAssetMap().values().stream()
             .filter(b -> b.getItem() != null && !b.getId().startsWith("*") && (ore(b) || log(b)))
             .forEach(b -> blocks.add(b.getId()));
-        Item.getAssetMap().getAssetMap().values().stream()
-            .filter(i -> i.getTool() != null && !i.isState() && !i.getId().startsWith("*"))
+        configurableTools()
             .filter(i -> defaultMode(i) != PlayerSettings.ToolBlockMode.ALL).forEach(i -> tools.add(i.getId()));
         return new PlayerSettings(blocks, tools, PlayerSettings.DEFAULT_RADIUS, PlayerSettings.Activation.CROUCH);
+    }
+
+    static Set<String> shovelDefaults() {
+        return configurableTools().filter(i -> defaultMode(i) == PlayerSettings.ToolBlockMode.DIRT_SAND)
+            .map(Item::getId).collect(Collectors.toSet());
+    }
+
+    private static Stream<Item> configurableTools() {
+        return Item.getAssetMap().getAssetMap().values().stream()
+            .filter(i -> i.getTool() != null && !i.isState() && !i.getId().startsWith("*"));
     }
 
     private static boolean tag(Item item, String value) {

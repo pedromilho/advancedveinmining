@@ -127,7 +127,7 @@ $C.@Container {
         }
         Group #ToolSettings {
           Visible: false;
-          Anchor: (Height: 420);
+          Anchor: (Height: 464);
           LayoutMode: Top;
           Label #ToolHeading { Anchor: (Height: 30); Style: (FontSize: 16, RenderBold: true, TextColor: #d3dee3); }
           ItemIcon #ToolPreview { Anchor: (Width: 80, Height: 80, Bottom: 8); }
@@ -141,6 +141,7 @@ $C.@Container {
           Label #ToolTypeLabel { Anchor: (Height: 30); Style: (FontSize: 14, TextColor: #d3dee3); }
           $C.@SmallSecondaryTextButton #ModeOres { Anchor: (Height: 36, Bottom: 8); Text: "Ores"; }
           $C.@SmallSecondaryTextButton #ModeLogs { Anchor: (Height: 36, Bottom: 8); Text: "Logs"; }
+          $C.@SmallSecondaryTextButton #ModeDirtSand { Anchor: (Height: 36, Bottom: 8); Text: "Dirt/Sand"; }
           $C.@SmallSecondaryTextButton #ModeAll { Anchor: (Height: 36, Bottom: 8); Text: "Everything"; }
           Label #ToolHint { Anchor: (Height: 36, Bottom: 8); Style: (FontSize: 12, Wrap: true, TextColor: #a8b6c6); }
         }

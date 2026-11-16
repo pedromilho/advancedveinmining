@@ -286,11 +286,11 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
         commands.set("#Players.Text", language.text(playersMenu ? "players.back" : "players.button"));
         commands.set("#ReadOnlyNotice.Visible", !canModify);
         commands.set("#ReadOnlyNotice.Text", language.text("permission.readonly"));
-        for (String button : List.of("RadiusMinus", "RadiusPlus", "Activation", "Defaults", "Clear", "ModeOres", "ModeLogs", "ModeAll", "Save", "Players"))
+        for (String button : List.of("RadiusMinus", "RadiusPlus", "Activation", "Defaults", "Clear", "ModeOres", "ModeLogs", "ModeDirtSand", "ModeAll", "Save", "Players"))
             commands.set("#" + button + ".Disabled", !canModify);
         if (playersMenu) syncPlayerChecks(commands);
         if (editingTool != null) {
-            for (String action : List.of("ModeOres", "ModeLogs", "ModeAll")) {
+            for (String action : List.of("ModeOres", "ModeLogs", "ModeDirtSand", "ModeAll")) {
                 events.addEventBinding(CustomUIEventBindingType.Activating, "#" + action,
                     EventData.of("Action", action).append("Tool", editingTool));
             }
@@ -310,6 +310,8 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
             selectedButton(commands, "#ModeOres", mode == PlayerSettings.ToolBlockMode.ORES);
             commands.set("#ModeLogs.Text", language.text("tool.logs"));
             selectedButton(commands, "#ModeLogs", mode == PlayerSettings.ToolBlockMode.LOGS);
+            commands.set("#ModeDirtSand.Text", language.text("tool.dirtSand"));
+            selectedButton(commands, "#ModeDirtSand", mode == PlayerSettings.ToolBlockMode.DIRT_SAND);
             commands.set("#ModeAll.Text", language.text("tool.all"));
             selectedButton(commands, "#ModeAll", mode == PlayerSettings.ToolBlockMode.ALL);
         }
@@ -448,11 +450,12 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
                 } catch (IOException error) { statusKey = "status.saveError"; }
             }
             case "General" -> editingTool = null;
-            case "ModeOres", "ModeLogs", "ModeAll" -> {
+            case "ModeOres", "ModeLogs", "ModeDirtSand", "ModeAll" -> {
                 if (data.tool != null && allowedTools.contains(data.tool)) {
                     toolModes.put(data.tool, switch (data.action) {
                         case "ModeOres" -> PlayerSettings.ToolBlockMode.ORES;
                         case "ModeLogs" -> PlayerSettings.ToolBlockMode.LOGS;
+                        case "ModeDirtSand" -> PlayerSettings.ToolBlockMode.DIRT_SAND;
                         default -> PlayerSettings.ToolBlockMode.ALL;
                     });
                     statusKey = "status.selection";

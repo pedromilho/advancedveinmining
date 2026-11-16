@@ -46,10 +46,7 @@ record PlayerSettings(Set<String> blocks, Set<String> tools, int radius, Activat
     }
 
     enum ToolBlockMode {
-        ORES, LOGS, ALL;
-        boolean allows(boolean ore, boolean log) {
-            return this == ALL || (this == ORES && ore) || (this == LOGS && log);
-        }
+        ORES, LOGS, DIRT_SAND, ALL
     }
 
     static PlayerSettings defaults() {

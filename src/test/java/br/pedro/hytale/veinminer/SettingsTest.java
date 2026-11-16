@@ -110,18 +110,13 @@ public final class SettingsTest {
         var modesDraft = new java.util.HashMap<String, PlayerSettings.ToolBlockMode>();
         modesDraft.put("OtherMod:Pickaxe", PlayerSettings.ToolBlockMode.ALL);
         modesDraft.put("OtherMod:Hatchet", PlayerSettings.ToolBlockMode.LOGS);
+        modesDraft.put("OtherMod:Shovel", PlayerSettings.ToolBlockMode.DIRT_SAND);
         var perTool = new PlayerSettings(chosen.blocks(), chosen.tools(), chosen.radius(), chosen.activation(), modesDraft);
         modesDraft.clear();
         repository.save(first, perTool);
         check(new SettingsRepository(root, warnings::add).get(first).equals(perTool), "Persist tool modes, including mod IDs");
         check(perTool.modeFor("OtherMod:Pickaxe", PlayerSettings.ToolBlockMode.ORES) == PlayerSettings.ToolBlockMode.ALL, "Explicit setting overrides inferred type");
         check(perTool.modeFor("NewMod:Hatchet", PlayerSettings.ToolBlockMode.LOGS) == PlayerSettings.ToolBlockMode.LOGS, "New tools inherit detected type");
-        check(PlayerSettings.ToolBlockMode.ORES.allows(true, false), "Pickaxe accepts ores");
-        check(!PlayerSettings.ToolBlockMode.ORES.allows(false, true), "Pickaxe rejects logs");
-        check(PlayerSettings.ToolBlockMode.LOGS.allows(false, true), "Hatchet accepts logs");
-        check(!PlayerSettings.ToolBlockMode.LOGS.allows(true, false), "Hatchet rejects ores");
-        check(!PlayerSettings.ToolBlockMode.LOGS.allows(false, false), "Logs excludes planks and other blocks");
-        check(PlayerSettings.ToolBlockMode.ALL.allows(false, false), "All accepts other selected blocks");
         check(new SettingsRepository(root.resolve("dynamic"), warnings::add, () -> perTool).get(second).equals(perTool), "New player defaults come from registered assets");
         var empty = new PlayerSettings(Set.of(), Set.of(), 32, PlayerSettings.Activation.CROUCH);
         restarted.save(first, empty);
@@ -176,6 +171,23 @@ public final class SettingsTest {
         check(!oreModInstalled.tools().contains("Mod:Ruby_Pickaxe") && !oreModInstalled.blocks().contains("Mod:Ruby_Ore"), "New mod preserves manually disabled existing pickaxes and ores");
         check(oreModInstalled.modeFor("Tool_Pickaxe_Copper", PlayerSettings.ToolBlockMode.ORES) == PlayerSettings.ToolBlockMode.ALL, "New mod preserves explicit pickaxe type override");
         check(oreModInstalled.radius() == 11 && oreModInstalled.activation() == PlayerSettings.Activation.WALK, "Ore detection preserves range and activation");
+
+        String shovel = "Tool_Shovel_Iron";
+        String modShovel = "OtherMod:Shovel";
+        var shovelRepo = new SettingsRepository(root, warnings::add, PlayerSettings::defaults, () -> additionalMod,
+            () -> newOreMod, () -> Set.of(shovel));
+        var shovelUpgrade = shovelRepo.get(legacy);
+        check(shovelUpgrade.allowsTool(shovel, false) && shovelUpgrade.toolModes().get(shovel) == PlayerSettings.ToolBlockMode.DIRT_SAND,
+            "Existing profiles enable newly discovered shovels in DIRT/SAND mode");
+        check(shovelUpgrade.blocks().equals(oreModInstalled.blocks()), "Shovel discovery leaves the Blocks selection intact");
+        shovelRepo.save(legacy, new PlayerSettings(shovelUpgrade.blocks(), oreModInstalled.tools(),
+            shovelUpgrade.radius(), shovelUpgrade.activation(), java.util.Map.of(shovel, PlayerSettings.ToolBlockMode.ALL)));
+        var anotherShovel = new SettingsRepository(root, warnings::add, PlayerSettings::defaults, () -> additionalMod,
+            () -> newOreMod, () -> Set.of(shovel, modShovel)).get(legacy);
+        check(anotherShovel.allowsTool(modShovel, false) && anotherShovel.toolModes().get(modShovel) == PlayerSettings.ToolBlockMode.DIRT_SAND,
+            "Shovels from later mods are also enabled by default");
+        check(!anotherShovel.allowsTool(shovel, false) && anotherShovel.toolModes().get(shovel) == PlayerSettings.ToolBlockMode.ALL,
+            "Later shovel discovery preserves manual settings for known shovels");
 
         String localized = CatalogSearch.normalize("Ore_Copper_Stone Minério de Cobre em Pedra");
         check(CatalogSearch.matches(localized, CatalogSearch.normalize("MINERIO COBRE")), "Buscar sem acentos e sem diferenciar maiusculas");

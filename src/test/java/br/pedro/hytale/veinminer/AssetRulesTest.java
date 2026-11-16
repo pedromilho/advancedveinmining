@@ -40,13 +40,16 @@ public final class AssetRulesTest {
             check(AssetRules.defaultMode(new Tool("OtherMod:LumberTool", 0.8f, 0.1f)) == PlayerSettings.ToolBlockMode.LOGS, "Recognize wood specs with custom ID");
             var ore = new Block("OtherMod:RubyDeposit", "OreRuby");
             var categoryOre = new Block("OtherMod:CustomDeposit", "CustomGather", "Blocks.Ores");
-            var log = new Block("OtherMod:Tree_Log", "Woods");
+            var log = new Block("OtherMod:Tree_Log", "CustomGather");
             var planks = new Block("OtherMod:Planks", "Woods", "Blocks.Wood");
             check(AssetRules.ore(ore) && AssetRules.ore(categoryOre), "Mod ores from gather type or categories");
-            check(AssetRules.log(log) && !AssetRules.log(planks), "Logs exclude planks");
+            check(AssetRules.log(log) && !AssetRules.log(planks), "Only actual logs are automatically selected");
             var settings = new PlayerSettings(Set.of(ore.getId(), log.getId(), planks.getId()), Set.of(pick.getId(), axe.getId()), 8, PlayerSettings.Activation.CROUCH);
             check(AssetRules.allows(settings, pick, ore) && !AssetRules.allows(settings, pick, log), "Pickaxe restrictions");
             check(AssetRules.allows(settings, axe, log) && !AssetRules.allows(settings, axe, ore), "Hatchet restrictions");
+            check(AssetRules.allows(settings, axe, planks), "LOGS mode accepts selected blocks with Woods gathering");
+            check(!AssetRules.allows(settings, axe, new Block("OtherMod:WoodenDoor", "Woods")),
+                "LOGS mode requires block selection for crafted wood");
             var all = new PlayerSettings(settings.blocks(), settings.tools(), 8, settings.activation(), java.util.Map.of(axe.getId(), PlayerSettings.ToolBlockMode.ALL));
             check(AssetRules.allows(all, axe, planks), "All permits selected planks");
             check(!AssetRules.allows(all, axe, categoryOre), "All still respects global block selection");
@@ -58,6 +61,7 @@ public final class AssetRulesTest {
             var misleadingLog = new Block("Ore:Tree_Log", "Woods", "Blocks.Ores");
             check(!AssetRules.ore(misleadingLog) && AssetRules.log(misleadingLog), "Wood is never classified as ore due to mod namespace or inherited ore category");
             verifyStoneMining(pick, axe);
+            verifySoilMining();
             System.out.println("Asset rules: mod tools, ore/log classification and per-tool restrictions passed.");
         } catch (Throwable failure) {
             var trace = new java.io.StringWriter();
@@ -65,6 +69,29 @@ public final class AssetRulesTest {
             java.nio.file.Files.writeString(java.nio.file.Path.of("build/asset-rules-test-error.txt"), trace.toString());
             throw failure;
         }
+    }
+
+    private static void verifySoilMining() {
+        var shovel = new Tool("Tool_Shovel_Iron", 0.05f, 0.05f);
+        var modShovel = new Item("OtherMod:Excavator") {
+            @Override public String[] getCategories() { return new String[] {"Items.Tools.Shovels"}; }
+        };
+        check(AssetRules.defaultMode(shovel) == PlayerSettings.ToolBlockMode.DIRT_SAND, "Base shovel defaults to DIRT/SAND");
+        check(AssetRules.defaultMode(modShovel) == PlayerSettings.ToolBlockMode.DIRT_SAND, "Mod shovel recognized by its category");
+        var soils = java.util.List.of(
+            new Block("Soil_Sand", "Soils"),
+            new Block("Soil_Gravel", "Soils", "Blocks.Rocks"),
+            new Block("OtherMod:VolcanicAsh", "Soils"));
+        var stone = new Block("Rock_Sandstone", "Rocks");
+        var selected = new java.util.HashSet<String>();
+        soils.forEach(block -> selected.add(block.getId()));
+        selected.add(stone.getId());
+        var settings = new PlayerSettings(selected, Set.of(shovel.getId()), 8, PlayerSettings.Activation.CROUCH);
+        for (var block : soils) {
+            check(AssetRules.allows(settings, shovel, block), "DIRT/SAND accepts selected soil: " + block.getId());
+        }
+        check(!AssetRules.allows(settings, shovel, stone), "DIRT/SAND rejects sandstone");
+        check(!AssetRules.allows(settings, shovel, new Block("Soil_Clay", "Soils")), "DIRT/SAND requires block selection");
     }
 
     private static void verifyStoneMining(Item pick, Item axe) {

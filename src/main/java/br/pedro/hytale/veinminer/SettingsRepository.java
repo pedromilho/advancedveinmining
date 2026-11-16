@@ -24,6 +24,7 @@ final class SettingsRepository {
     private final Supplier<PlayerSettings> defaults;
     private final Supplier<PlayerSettings> automaticLogs;
     private final Supplier<PlayerSettings> automaticOres;
+    private final Supplier<Set<String>> automaticShovels;
 
     SettingsRepository(Path directory, Consumer<String> warning) {
         this(directory, warning, PlayerSettings::defaults);
@@ -41,7 +42,14 @@ final class SettingsRepository {
 
     SettingsRepository(Path directory, Consumer<String> warning, Supplier<PlayerSettings> defaults,
                        Supplier<PlayerSettings> automaticLogs, Supplier<PlayerSettings> automaticOres) {
+        this(directory, warning, defaults, automaticLogs, automaticOres, Set::of);
+    }
+
+    SettingsRepository(Path directory, Consumer<String> warning, Supplier<PlayerSettings> defaults,
+                       Supplier<PlayerSettings> automaticLogs, Supplier<PlayerSettings> automaticOres,
+                       Supplier<Set<String>> automaticShovels) {
         this.automaticOres = automaticOres;
+        this.automaticShovels = automaticShovels;
         this.automaticLogs = automaticLogs;
         this.defaults = defaults;
         this.directory = directory;
@@ -75,6 +83,7 @@ final class SettingsRepository {
         PlayerSettings discoveredOres = automaticOres.get();
         values.setProperty("KnownPickaxes", String.join(",", new java.util.TreeSet<>(discoveredOres.tools())));
         values.setProperty("KnownOres", String.join(",", new java.util.TreeSet<>(discoveredOres.blocks())));
+        values.setProperty("KnownShovels", String.join(",", new java.util.TreeSet<>(automaticShovels.get())));
         Path temporary = Files.createTempFile(directory, player.toString(), ".tmp");
         try {
             try (var stream = Files.newOutputStream(temporary)) { values.store(stream, "Advenced Vein Mining - player settings"); }
@@ -130,9 +139,13 @@ final class SettingsRepository {
             updatedTools.addAll(newPickaxes);
             updatedBlocks.addAll(newOres);
             newPickaxes.forEach(id -> modes.putIfAbsent(id, PlayerSettings.ToolBlockMode.ORES));
+            var newShovels = new java.util.HashSet<>(automaticShovels.get());
+            newShovels.removeAll(Arrays.asList(values.getProperty("KnownShovels", "").split(",")));
+            updatedTools.addAll(newShovels);
+            newShovels.forEach(id -> modes.putIfAbsent(id, PlayerSettings.ToolBlockMode.DIRT_SAND));
             var updated = new PlayerSettings(updatedBlocks, updatedTools, loaded.radius(), loaded.activation(), modes, loaded.veinOutline(), loaded.luckyOutline(),
                 loaded.veinThroughBlocks(), loaded.luckyThroughBlocks());
-            if (!newTools.isEmpty() || !newBlocks.isEmpty() || !newPickaxes.isEmpty() || !newOres.isEmpty()
+            if (!newTools.isEmpty() || !newBlocks.isEmpty() || !newPickaxes.isEmpty() || !newOres.isEmpty() || !newShovels.isEmpty()
                 || !values.containsKey("KnownHatchets") || !values.containsKey("KnownPickaxes")) {
                 try { write(player, updated); }
                 catch (IOException error) { warning.accept("Could not persist newly detected tools/blocks: " + error.getMessage()); }
