@@ -57,6 +57,7 @@ public final class AssetRulesTest {
             check(AssetRules.allows(oreOnlyHatchet, axe, ore), "Hatchet explicitly set to ORES can vein mine selected ore");
             var misleadingLog = new Block("Ore:Tree_Log", "Woods", "Blocks.Ores");
             check(!AssetRules.ore(misleadingLog) && AssetRules.log(misleadingLog), "Wood is never classified as ore due to mod namespace or inherited ore category");
+            verifyStoneMining(pick, axe);
             System.out.println("Asset rules: mod tools, ore/log classification and per-tool restrictions passed.");
         } catch (Throwable failure) {
             var trace = new java.io.StringWriter();
@@ -65,6 +66,27 @@ public final class AssetRulesTest {
             throw failure;
         }
     }
+
+    private static void verifyStoneMining(Item pick, Item axe) {
+        var stone = new Block("Rock_Stone", "Rocks", "Blocks.Rocks");
+        var volcanicBrick = new Block("Rock_Volcanic_Brick", "VolcanicRocks");
+        var modStone = new Block("OtherMod:MarbleTiles", "CustomGather", "Blocks.Rocks");
+        var gravel = new Block("Soil_Gravel", "Soils", "Blocks.Rocks");
+        var settings = new PlayerSettings(Set.of(stone.getId(), volcanicBrick.getId(), modStone.getId(), gravel.getId()),
+            Set.of(pick.getId(), axe.getId()), 8, PlayerSettings.Activation.CROUCH);
+        for (var block : java.util.List.of(stone, volcanicBrick, modStone)) {
+            check(AssetRules.allows(settings, pick, block), "ORES mode accepts selected stone: " + block.getId());
+            check(!AssetRules.allows(settings, axe, block), "LOGS mode rejects stone: " + block.getId());
+            check(!AssetRules.ore(block), "Stone stays out of automatic ore selection and Lucky Mining");
+        }
+        check(!AssetRules.allows(settings, pick, gravel), "Gravel uses soil gathering, despite the catalog category");
+        var unselected = new PlayerSettings(Set.of(), settings.tools(), 8, settings.activation());
+        check(!AssetRules.allows(unselected, pick, stone), "Stone must be manually selected");
+        var everything = new PlayerSettings(settings.blocks(), settings.tools(), 8, settings.activation(),
+            java.util.Map.of(pick.getId(), PlayerSettings.ToolBlockMode.ALL));
+        check(AssetRules.allows(everything, pick, stone), "Everything still accepts selected stone");
+    }
+
     private static final class DropStack extends com.hypixel.hytale.server.core.inventory.ItemStack {
         DropStack() {
             itemId = "OtherMod:Ruby";

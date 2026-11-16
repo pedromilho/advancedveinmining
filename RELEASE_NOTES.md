@@ -1,4 +1,3 @@
 Compatible with hytale 0.7.7
 
-- Added vein outlines and Lucky Mining ore highlights.
-- Added visual settings and experimental through-wall outlines.
+Pickaxes can now vein-mine selected stone blocks and their variants in Ores mode. Stone blocks are disabled by default.

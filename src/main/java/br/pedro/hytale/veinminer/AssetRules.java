@@ -12,10 +12,24 @@ final class AssetRules {
     static boolean ore(BlockType block) {
         if (log(block)) return false;
         Item item = block.getItem();
-        String gather = block.getGathering() == null || block.getGathering().getBreaking() == null
-            ? "" : block.getGathering().getBreaking().getGatherType();
-        return token(block.getId(), "ore") || lower(gather).startsWith("ore")
+        return token(block.getId(), "ore") || gatherType(block).startsWith("ore")
             || tag(item, "Ore") || tag(block.getData(), "Ore") || category(item, "Blocks.Ores");
+    }
+
+    private static boolean stone(BlockType block) {
+        String gather = gatherType(block);
+        if ("rocks".equals(gather) || "volcanicrocks".equals(gather)) return true;
+        // Gravel can share the Rocks catalog category while remaining a soil for mining.
+        if ("soils".equals(gather)) return false;
+        Item item = block.getItem();
+        return tag(item, "Rock") || tag(item, "Stone") || tag(block.getData(), "Rock")
+            || tag(block.getData(), "Stone") || category(item, "Blocks.Rocks");
+    }
+
+    private static String gatherType(BlockType block) {
+        var gathering = block.getGathering();
+        return gathering == null || gathering.getBreaking() == null
+            ? "" : lower(gathering.getBreaking().getGatherType());
     }
 
     static boolean log(BlockType block) {
@@ -53,9 +67,11 @@ final class AssetRules {
     }
 
     static boolean allows(PlayerSettings settings, Item item, BlockType block) {
-        if (item == null) return false;
+        if (item == null || !settings.blocks().contains(block.getId())) return false;
         var mode = settings.modeFor(item.getId(), defaultMode(item));
-        return settings.blocks().contains(block.getId()) && mode.allows(ore(block), log(block));
+        if (mode == PlayerSettings.ToolBlockMode.ALL) return true;
+        boolean isLog = log(block);
+        return mode.allows(!isLog && (ore(block) || stone(block)), isLog);
     }
 
     static PlayerSettings pickaxeDefaults() {
