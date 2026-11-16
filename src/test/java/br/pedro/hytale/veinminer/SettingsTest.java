@@ -88,6 +88,15 @@ public final class SettingsTest {
         UUID first = UUID.randomUUID();
         UUID second = UUID.randomUUID();
         check(repository.get(first).equals(defaults), "Jogador novo recebe padroes");
+        check(defaults.veinOutline() && defaults.luckyOutline(), "Both visual effects are enabled by default");
+        check(!defaults.veinThroughBlocks() && !defaults.luckyThroughBlocks(), "Through-block outlines are opt-in");
+        var visualsOff = new PlayerSettings(defaults.blocks(), defaults.tools(), defaults.radius(),
+            defaults.activation(), defaults.toolModes(), false, false, true, false);
+        repository.save(second, visualsOff);
+        var reloaded = new SettingsRepository(root, warnings::add);
+        check(reloaded.get(second).equals(visualsOff), "Outline and through-block preferences survive saving and reloading");
+        Files.delete(root.resolve(second + ".properties"));
+        repository = new SettingsRepository(root, warnings::add);
         var chosen = new PlayerSettings(Set.of("Ore_Copper_Stone", "Rock_Stone"),
             Set.of("Tool_Hatchet_Copper", "CustomMod_MiningTool"), 12, PlayerSettings.Activation.WALK);
         check(chosen.allowsTool("Tool_Hatchet_Copper", false), "Permitir outra categoria de ferramenta marcada");
@@ -131,6 +140,7 @@ public final class SettingsTest {
             Set.of("Mod:Hatchet", "Tool_Hatchet_Mithril"), 8, PlayerSettings.Activation.CROUCH);
         var migratedRepo = new SettingsRepository(root, warnings::add, PlayerSettings::defaults, () -> automatic);
         var upgraded = migratedRepo.get(legacy);
+        check(upgraded.veinOutline() && upgraded.luckyOutline(), "Legacy settings enable both visual effects");
         check(upgraded.tools().containsAll(automatic.tools()) && upgraded.blocks().containsAll(automatic.blocks()), "Old settings receive all discovered hatchets and logs automatically");
         check(upgraded.modeFor("Mod:Hatchet", PlayerSettings.ToolBlockMode.ALL) == PlayerSettings.ToolBlockMode.LOGS, "New mod hatchet defaults to logs");
         check(upgraded.radius() == 5 && upgraded.activation() == PlayerSettings.Activation.SPRINT, "Migration preserves range and controls");

@@ -62,6 +62,10 @@ final class SettingsRepository {
         Properties values = new Properties();
         values.setProperty("Radius", Integer.toString(settings.radius()));
         values.setProperty("Activation", settings.activation().name());
+        values.setProperty("VeinOutline", Boolean.toString(settings.veinOutline()));
+        values.setProperty("LuckyOutline", Boolean.toString(settings.luckyOutline()));
+        values.setProperty("VeinThroughBlocks", Boolean.toString(settings.veinThroughBlocks()));
+        values.setProperty("LuckyThroughBlocks", Boolean.toString(settings.luckyThroughBlocks()));
         values.setProperty("Blocks", settings.blocks().stream().sorted().collect(Collectors.joining(",")));
         values.setProperty("Tools", settings.tools().stream().sorted().collect(Collectors.joining(",")));
         settings.toolModes().forEach((id, mode) -> values.setProperty("ToolMode." + id, mode.name()));
@@ -103,7 +107,11 @@ final class SettingsRepository {
                     : Arrays.stream(values.getProperty("Tools").split(",")).map(String::trim)
                         .filter(s -> !s.isEmpty()).collect(Collectors.toSet()),
                 Integer.parseInt(values.getProperty("Radius", "8")),
-                PlayerSettings.Activation.valueOf(values.getProperty("Activation", "CROUCH")), modes);
+                PlayerSettings.Activation.valueOf(values.getProperty("Activation", "CROUCH")), modes,
+                Boolean.parseBoolean(values.getProperty("VeinOutline", "true")),
+                Boolean.parseBoolean(values.getProperty("LuckyOutline", "true")),
+                Boolean.parseBoolean(values.getProperty("VeinThroughBlocks", "false")),
+                Boolean.parseBoolean(values.getProperty("LuckyThroughBlocks", "false")));
             PlayerSettings discovered = automaticLogs.get();
             var updatedTools = new java.util.HashSet<>(loaded.tools());
             var updatedBlocks = new java.util.HashSet<>(loaded.blocks());
@@ -122,7 +130,8 @@ final class SettingsRepository {
             updatedTools.addAll(newPickaxes);
             updatedBlocks.addAll(newOres);
             newPickaxes.forEach(id -> modes.putIfAbsent(id, PlayerSettings.ToolBlockMode.ORES));
-            var updated = new PlayerSettings(updatedBlocks, updatedTools, loaded.radius(), loaded.activation(), modes);
+            var updated = new PlayerSettings(updatedBlocks, updatedTools, loaded.radius(), loaded.activation(), modes, loaded.veinOutline(), loaded.luckyOutline(),
+                loaded.veinThroughBlocks(), loaded.luckyThroughBlocks());
             if (!newTools.isEmpty() || !newBlocks.isEmpty() || !newPickaxes.isEmpty() || !newOres.isEmpty()
                 || !values.containsKey("KnownHatchets") || !values.containsKey("KnownPickaxes")) {
                 try { write(player, updated); }

@@ -3,7 +3,8 @@ package br.pedro.hytale.veinminer;
 import java.util.Set;
 import java.util.Map;
 
-record PlayerSettings(Set<String> blocks, Set<String> tools, int radius, Activation activation, Map<String, ToolBlockMode> toolModes) {
+record PlayerSettings(Set<String> blocks, Set<String> tools, int radius, Activation activation, Map<String, ToolBlockMode> toolModes,
+                      boolean veinOutline, boolean luckyOutline, boolean veinThroughBlocks, boolean luckyThroughBlocks) {
     static final int DEFAULT_RADIUS = 8;
     static final int MAX_RADIUS = 32;
     static final Set<String> DEFAULT_TOOLS = Set.of(
@@ -29,6 +30,11 @@ record PlayerSettings(Set<String> blocks, Set<String> tools, int radius, Activat
         toolModes = Map.copyOf(toolModes);
         if (radius < 1 || radius > MAX_RADIUS) throw new IllegalArgumentException("Distance must be between 1 and 32.");
         if (activation == null) throw new IllegalArgumentException("Choose an activation action.");
+    }
+
+    PlayerSettings(Set<String> blocks, Set<String> tools, int radius, Activation activation,
+                   Map<String, ToolBlockMode> toolModes) {
+        this(blocks, tools, radius, activation, toolModes, true, true, false, false);
     }
 
     PlayerSettings(Set<String> blocks, Set<String> tools, int radius, Activation activation) {

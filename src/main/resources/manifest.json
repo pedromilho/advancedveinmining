@@ -7,7 +7,7 @@
   "Main": "br.pedro.hytale.veinminer.VeinMinerPlugin",
   "ServerVersion": "=0.7.7",
   "Dependencies": {},
-  "OptionalDependencies": {},
+  "OptionalDependencies": {"Buuz135:LuckyMining": "*"},
   "DisabledByDefault": false,
   "IncludesAssetPack": true
 }

@@ -62,6 +62,11 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
     private SelectionFilter selectionFilter = SelectionFilter.ALL;
     private boolean toolMenu;
     private boolean playersMenu;
+    private boolean visualsMenu;
+    private boolean veinOutline;
+    private boolean luckyOutline;
+    private boolean veinThroughBlocks;
+    private boolean luckyThroughBlocks;
     private PlayerListEntry.Filter playerFilter = PlayerListEntry.Filter.ALL;
     private final CatalogWindow<PlayerListEntry> playersWindow = new CatalogWindow<>();
     private final Map<UUID, String> visiblePlayers = new HashMap<>();
@@ -78,6 +83,10 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
         blocks = new HashSet<>(current.blocks());
         tools = new HashSet<>(current.tools());
         toolModes.putAll(current.toolModes());
+        veinOutline = current.veinOutline();
+        luckyOutline = current.luckyOutline();
+        veinThroughBlocks = current.veinThroughBlocks();
+        luckyThroughBlocks = current.luckyThroughBlocks();
         radius = current.radius();
         activation = current.activation();
         blockCatalog = BlockType.getAssetMap().getAssetMap().values().stream()
@@ -119,10 +128,14 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
         events.addEventBinding(CustomUIEventBindingType.ValueChanged, "#Radius",
             EventData.of("Action", "Radius").append("@Radius", "#Radius.Value"), false);
         for (String action : List.of("BlocksTab", "ToolsTab", "Filter", "RadiusMinus", "RadiusPlus",
-                "Activation", "Defaults", "Clear", "Cancel", "Players", "CommandAdminOnly", "CommandAll")) bind(events, "#" + action, action);
+                "Activation", "Defaults", "Clear", "Cancel", "Players", "Visuals", "CommandAdminOnly", "CommandAll")) bind(events, "#" + action, action);
         // Lê também o valor atual ao salvar, mesmo sem sair do campo numérico.
         events.addEventBinding(CustomUIEventBindingType.Activating, "#Save",
             EventData.of("Action", "Save").append("@Radius", "#Radius.Value"));
+        for (String action : List.of("VeinOutline", "LuckyOutline", "VeinThroughBlocks", "LuckyThroughBlocks")) {
+            events.addEventBinding(CustomUIEventBindingType.ValueChanged, "#" + action,
+                EventData.of("Action", action).append("@Selected", "#" + action + ".Value"));
+        }
         commands.set("#Radius.Value", radius);
         renderGrid(commands, events);
         renderControls(commands, events);
@@ -231,13 +244,32 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
 
     private void renderControls(UICommandBuilder commands, UIEventBuilder events) {
         boolean canModify = ConfigurationAccess.canModify(playerRef);
-        commands.set("#GeneralSettings.Visible", !playersMenu && editingTool == null);
-        commands.set("#ToolSettings.Visible", !playersMenu && editingTool != null);
-        commands.set("#Players.Visible", playersMenu || editingTool == null);
+        commands.set("#GeneralSettings.Visible", !playersMenu && !visualsMenu && editingTool == null);
+        commands.set("#ToolSettings.Visible", !playersMenu && !visualsMenu && editingTool != null);
+        commands.set("#Players.Visible", !visualsMenu && (playersMenu || editingTool == null));
+        commands.set("#Visuals.Visible", !playersMenu);
+        commands.set("#Visuals.Text", language.text(visualsMenu ? "visuals.back" : "visuals.button"));
+        commands.set("#VisualSettings.Visible", visualsMenu);
+        commands.set("#VisualHeading.Text", language.text("visuals.button"));
+        commands.set("#VeinOutlineLabel.Text", language.text("visuals.vein"));
+        commands.set("#LuckyOutlineLabel.Text", language.text("visuals.lucky"));
+        commands.set("#VeinThroughBlocksLabel.Text", language.text("visuals.veinThroughBlocks"));
+        commands.set("#LuckyThroughBlocksLabel.Text", language.text("visuals.luckyThroughBlocks"));
+        boolean luckyAvailable = MiningVisuals.luckyAvailable();
+        commands.set("#LuckyOutline.Visible", luckyAvailable);
+        commands.set("#LuckyOutlineLocked.Visible", !luckyAvailable);
+        commands.set("#LuckyThroughBlocks.Visible", luckyAvailable);
+        commands.set("#LuckyThroughBlocksLocked.Visible", !luckyAvailable);
+        commands.set("#LuckyRequired.Visible", !luckyAvailable);
+        commands.set("#LuckyRequired.Text", language.text("visuals.luckyRequired"));
+        commands.set("#VeinOutline.Value", veinOutline);
+        commands.set("#LuckyOutline.Value", luckyOutline);
+        commands.set("#VeinThroughBlocks.Value", veinThroughBlocks);
+        commands.set("#LuckyThroughBlocks.Value", luckyThroughBlocks);
         commands.set("#PermissionsHelp.Visible", playersMenu);
         commands.set("#PlayerColumns.Visible", playersMenu);
         commands.set("#CatalogTabs.Visible", !playersMenu);
-        commands.set("#ListActions.Visible", !playersMenu);
+        commands.set("#ListActions.Visible", !playersMenu && !visualsMenu);
         commands.set("#PermissionsHeading.Text", language.text("players.heading"));
         commands.set("#CommandAccessTitle.Text", language.text("commands.title"));
         commands.set("#CommandAccessHint.Text", language.text("commands.hint"));
@@ -377,12 +409,29 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
             case "BlocksTab", "ToolsTab" -> {
                 toolMenu = data.action.equals("ToolsTab");
                 editingTool = null;
+                visualsMenu = false;
                 search = ""; selectionFilter = SelectionFilter.ALL;
                 playerFilter = PlayerListEntry.Filter.ALL;
                 commands.set("#Search.Value", "");
                 refreshGrid = true;
             }
+            case "Visuals" -> {
+                if (!playersMenu) visualsMenu = !visualsMenu;
+            }
+            case "VeinOutline", "LuckyOutline", "VeinThroughBlocks", "LuckyThroughBlocks" -> {
+                if (!visualsMenu || data.selected == null) break;
+                if ((data.action.equals("LuckyOutline") || data.action.equals("LuckyThroughBlocks"))
+                    && !MiningVisuals.luckyAvailable()) break;
+                switch (data.action) {
+                    case "VeinOutline" -> veinOutline = data.selected;
+                    case "LuckyOutline" -> luckyOutline = data.selected;
+                    case "VeinThroughBlocks" -> veinThroughBlocks = data.selected;
+                    case "LuckyThroughBlocks" -> luckyThroughBlocks = data.selected;
+                }
+                statusKey = "status.pending";
+            }
             case "Players" -> {
+                if (visualsMenu) break;
                 playersMenu = !playersMenu;
                 search = ""; selectionFilter = SelectionFilter.ALL;
                 playerFilter = PlayerListEntry.Filter.ALL;
@@ -456,7 +505,8 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
                 if (!validRadius(data.radius)) { statusKey = "status.invalidSave"; break; }
                 radius = data.radius;
                 try {
-                    settings.save(playerRef.getUuid(), new PlayerSettings(blocks, tools, radius, activation, toolModes));
+                    settings.save(playerRef.getUuid(), new PlayerSettings(blocks, tools, radius, activation, toolModes, veinOutline, luckyOutline,
+                        veinThroughBlocks, luckyThroughBlocks));
                     playerRef.sendMessage(Message.raw(language.text("saved", blocks.size(), tools.size(), radius,
                         language.text("activation." + activation.name()))));
                     statusKey = "status.saved";
@@ -491,7 +541,10 @@ public final class VeinMinerSettingsPage extends InteractiveCustomUIPage<VeinMin
                 }
                 if (data.action.startsWith("Edit:Tool:")) {
                     String id = data.action.substring("Edit:Tool:".length());
-                    if (toolMenu && allowedTools.contains(id)) editingTool = id;
+                    if (toolMenu && allowedTools.contains(id)) {
+                        editingTool = id;
+                        visualsMenu = false;
+                    }
                     break;
                 }
                 boolean toggle = data.action.startsWith("Toggle:");

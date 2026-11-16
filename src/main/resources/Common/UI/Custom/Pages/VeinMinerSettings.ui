@@ -18,6 +18,13 @@ $C = "../Common.ui";
   Pressed: (Background: PatchStyle(TexturePath: "../Common/Buttons/Disabled.png", Border: $C.@ButtonBorder))
 );
 
+@LockedVisualCheck = Group {
+  Visible: false;
+  Anchor: (Width: 22, Height: 22, Right: 10);
+  Background: (TexturePath: "../Common/CheckBoxFrame.png", Border: 7);
+  Group { Anchor: (Full: 4); Background: #424242; }
+};
+
 $C.@PageOverlay {}
 
 $C.@Container {
@@ -137,6 +144,53 @@ $C.@Container {
           $C.@SmallSecondaryTextButton #ModeAll { Anchor: (Height: 36, Bottom: 8); Text: "Everything"; }
           Label #ToolHint { Anchor: (Height: 36, Bottom: 8); Style: (FontSize: 12, Wrap: true, TextColor: #a8b6c6); }
         }
+        Group #VisualSettings {
+          Visible: false;
+          Anchor: (Height: 290);
+          LayoutMode: Top;
+          Label #VisualHeading { Anchor: (Height: 32); Style: (FontSize: 16, RenderBold: true, TextColor: #d3dee3); }
+          Group {
+            Anchor: (Height: 38);
+            LayoutMode: Left;
+            $C.@CheckBox #VeinOutline { Anchor: (Width: 22, Height: 22, Right: 10); }
+            Label #VeinOutlineLabel { FlexWeight: 1; Anchor: (Height: 38); Style: (FontSize: 14, Wrap: true, TextColor: #d3dee3); }
+          }
+          Group {
+            Anchor: (Height: 38);
+            LayoutMode: Left;
+            $C.@CheckBox #LuckyOutline { Anchor: (Width: 22, Height: 22, Right: 10); }
+            @LockedVisualCheck #LuckyOutlineLocked {}
+            Label #LuckyOutlineLabel { FlexWeight: 1; Anchor: (Height: 38); Style: (FontSize: 14, Wrap: true, TextColor: #d3dee3); }
+          }
+          Label #LuckyRequired {
+            Visible: false;
+            Anchor: (Height: 34, Left: 32);
+            Style: (FontSize: 12, Wrap: true, TextColor: #e9c77b);
+          }
+          Label {
+            Anchor: (Height: 24, Top: 12);
+            Text: "Experimentals";
+            Style: (FontSize: 16, RenderBold: true, TextColor: #d3dee3);
+          }
+          Label {
+            Anchor: (Height: 28);
+            Text: "They do the work, just not properly.";
+            Style: (FontSize: 12, Wrap: true, TextColor: #e9c77b);
+          }
+          Group {
+            Anchor: (Height: 38);
+            LayoutMode: Left;
+            $C.@CheckBox #VeinThroughBlocks { Anchor: (Width: 22, Height: 22, Right: 10); }
+            Label #VeinThroughBlocksLabel { FlexWeight: 1; Anchor: (Height: 38); Style: (FontSize: 14, Wrap: true, TextColor: #d3dee3); }
+          }
+          Group {
+            Anchor: (Height: 38);
+            LayoutMode: Left;
+            $C.@CheckBox #LuckyThroughBlocks { Anchor: (Width: 22, Height: 22, Right: 10); }
+            @LockedVisualCheck #LuckyThroughBlocksLocked {}
+            Label #LuckyThroughBlocksLabel { FlexWeight: 1; Anchor: (Height: 38); Style: (FontSize: 14, Wrap: true, TextColor: #d3dee3); }
+          }
+        }
         Group #PermissionsHelp {
           Visible: false;
           Anchor: (Height: 370);
@@ -155,6 +209,7 @@ $C.@Container {
         Label #Summary { Anchor: (Height: 26); Style: (FontSize: 13, Wrap: true, TextColor: #d3dee3); }
         Label #ReadOnlyNotice { Visible: false; Anchor: (Height: 40); Style: (FontSize: 13, Wrap: true, TextColor: #e9c77b); }
         $C.@SmallSecondaryTextButton #Players { Anchor: (Height: 32, Bottom: 8); Text: "Player permissions"; }
+        $C.@SmallSecondaryTextButton #Visuals { Anchor: (Height: 32, Bottom: 8); Text: "Visuals"; }
         Group #ListActions {
           Anchor: (Height: 32);
           LayoutMode: Left;

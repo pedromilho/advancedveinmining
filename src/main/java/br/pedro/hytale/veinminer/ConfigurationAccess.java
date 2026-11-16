@@ -60,7 +60,7 @@ final class ConfigurationAccess {
         return enabled ? requested : current == requested ? Level.OFF : current;
     }
     static boolean isBrowsingAction(String action) {
-        return action != null && (Set.of("Cancel", "Search", "BlocksTab", "ToolsTab", "Filter", "General").contains(action)
+        return action != null && (Set.of("Cancel", "Search", "BlocksTab", "ToolsTab", "Filter", "General", "Visuals").contains(action)
             || action.startsWith("LoadAhead:") || action.startsWith("Edit:Tool:"));
     }
     static boolean canPerform(PermissionHolder player, String action) {

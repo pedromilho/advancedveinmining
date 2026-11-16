@@ -13,6 +13,7 @@ import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 
 public final class VeinMinerPlugin extends JavaPlugin {
     private VeinMiningSystem mining;
+    private MiningVisuals visuals;
 
     public VeinMinerPlugin(JavaPluginInit init) {
         super(init);
@@ -31,8 +32,15 @@ public final class VeinMinerPlugin extends JavaPlugin {
             message -> getLogger().atWarning().log(message)));
         mining = new VeinMiningSystem(settings);
         getEntityStoreRegistry().registerSystem(mining);
+        visuals = new MiningVisuals(settings);
+        getEntityStoreRegistry().registerSystem(visuals);
         getCommandRegistry().registerCommand(new SettingsCommand(settings));
-        getLogger().atInfo().log("Advenced Vein Mining 0.7.2 loaded. Use /veinminer to configure.");
+        getLogger().atInfo().log("Advenced Vein Mining 0.7.3 loaded. Use /veinminer to configure.");
+    }
+
+    @Override
+    protected void start() {
+        LuckyMiningIntegration.register(getEntityStoreRegistry(), visuals, getLogger());
     }
 
     @Override

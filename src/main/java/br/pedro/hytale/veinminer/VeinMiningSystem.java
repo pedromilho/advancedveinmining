@@ -26,7 +26,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 final class VeinMiningSystem extends EntityEventSystem<EntityStore, BreakBlockEvent> {
-    private static final int LIMIT = 32;
+    static final int LIMIT = 32;
     private final SettingsRepository settings;
     private final Set<UUID> busy = ConcurrentHashMap.newKeySet();
     private volatile boolean closed;
@@ -89,7 +89,7 @@ final class VeinMiningSystem extends EntityEventSystem<EntityStore, BreakBlockEv
         return !closed && player.isValid() && activationHeld(player, entities, config);
     }
 
-    private static boolean activationHeld(Ref<EntityStore> player,
+    static boolean activationHeld(Ref<EntityStore> player,
             ComponentAccessor<EntityStore> entities, PlayerSettings config) {
         var component = entities.getComponent(player, MovementStatesComponent.getComponentType());
         if (component == null || component.getMovementStates() == null) return false;
@@ -97,7 +97,7 @@ final class VeinMiningSystem extends EntityEventSystem<EntityStore, BreakBlockEv
         return config.activation().active(state.crouching, state.forcedCrouching, state.walking, state.sprinting);
     }
 
-    private static boolean usableTool(ItemStack tool, PlayerSettings config) {
+    static boolean usableTool(ItemStack tool, PlayerSettings config) {
         return !ItemStack.isEmpty(tool) && config.allowsTool(tool.getItemId(), tool.isBroken());
     }
 
@@ -107,14 +107,14 @@ final class VeinMiningSystem extends EntityEventSystem<EntityStore, BreakBlockEv
             && current.getQualityIndex() == original.getQualityIndex();
     }
 
-    private static int blockAt(ChunkStore chunks, VeinTraversal.Position p) {
+    static int blockAt(ChunkStore chunks, VeinTraversal.Position p) {
         Ref<ChunkStore> section = chunks.getChunkSectionReferenceAtBlock(p.x(), p.y(), p.z());
         if (section == null || !section.isValid()) return -1;
         BlockSection blocks = chunks.getStore().getComponent(section, BlockSection.getComponentType());
         return blocks == null ? -1 : blocks.get(p.x(), p.y(), p.z());
     }
 
-    private static boolean matches(ChunkStore chunks, VeinTraversal.Position p, String blockId) {
+    static boolean matches(ChunkStore chunks, VeinTraversal.Position p, String blockId) {
         int id = blockAt(chunks, p);
         BlockType type = id < 0 ? null : BlockType.getAssetMap().getAsset(id);
         return type != null && blockId.equals(type.getId());
